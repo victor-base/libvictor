@@ -40,7 +40,7 @@ int main() {
         
         generate_random_vector(vector, dims);
         
-        if (index->insert(index->data, i, vector, dims) != 0) {
+        if (insert(index, i, vector, dims) != 0) {
             printf("Error: No se pudo insertar el vector %d.\n", i);
             return 1;
         }
@@ -48,7 +48,7 @@ int main() {
     
     printf("Se han insertado %d vectores correctamente.\n", NUM_VECTORS);
 
-    if (index->search(index->data, vector, dims, &result) != 0) {
+    if (search(index, vector, dims, &result) != 0) {
         printf("Error en la búsqueda.\n");
         return 1;
     }
