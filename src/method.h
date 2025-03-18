@@ -43,11 +43,6 @@ typedef struct {
     float32_t (*compare_vectors) (float32_t *, float32_t *, int);  // Function to compute similarity/distance
  } CmpMethod;
  
-/**
- * Enumeration of available comparison methods.
- */
-#define L2NORM 0x00  // Euclidean Distance
-#define COSINE 0x01  // Cosine Similarity
 
 /**
  * Macro to determine the number of available methods.
