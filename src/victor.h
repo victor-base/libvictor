@@ -37,6 +37,12 @@ typedef struct {
     float32_t distance;
 } MatchResult;
 
+/**
+ * Enumeration of available comparison methods.
+ */
+#define L2NORM 0x00  // Euclidean Distance
+#define COSINE 0x01  // Cosine Similarity
+
 
 typedef enum {
     SUCCESS,
