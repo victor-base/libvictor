@@ -168,13 +168,13 @@ float32_t cosine_similarity(float32_t *v1, float32_t *v2, int dims)
     }
 
     __m128 temp = _mm_add_ps(acc_dot, _mm_movehl_ps(acc_dot, acc_dot));
-    float dot = _mm_cvtss_f32(_mm_add_ss(temp, _mm_shuffle_ps(temp, temp, 1)));
+    dot = _mm_cvtss_f32(_mm_add_ss(temp, _mm_shuffle_ps(temp, temp, 1)));
 
     temp = _mm_add_ps(acc_norm1, _mm_movehl_ps(acc_norm1,acc_norm1));
-    float norm1 = sqrtf(_mm_cvtsd_f32(_mm_add_ss(temp, _mm_shuffle_ps(temp, temp, 1))));
+    norm1 = sqrtf(_mm_cvtss_f32(_mm_add_ss(temp, _mm_shuffle_ps(temp, temp, 1))));
    
     temp = _mm_add_ps(acc_norm2, _mm_movehl_ps(acc_norm2, acc_norm2));
-    float norm2 = sqrtf(_mm_cvtsd_f32(_mm_add_ss(temp, _mm_shuffle_ps(temp, temp, 1))));
+     norm2 = sqrtf(_mm_cvtss_f32(_mm_add_ss(temp, _mm_shuffle_ps(temp, temp, 1))));
 
 
 #else //Fallback case

@@ -35,7 +35,7 @@
   * @param dims  Number of dimensions (size of the vector).
   * @return Pointer to the newly allocated `Vector` structure, or NULL on failure.
   */
-Vector *make_vector(u_int64_t id, float32_t *src, uint16_t dims) {
+Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims) {
     Vector *vector;
     uint16_t dims_aligned = ALIGN_DIMS(dims);
     
