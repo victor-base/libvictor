@@ -24,6 +24,12 @@
 
 #ifdef __ARM_NEON
 #include <arm_neon.h>
+
+#endif
+
+// SSE architecture macro declaration.
+#ifdef __SSE__
+#include <xmmintrin.h>
 #endif
 
 #include "vector.h"
@@ -46,7 +52,7 @@ float32_t euclidean_distance(float32_t *v1, float32_t *v2, int dims) {
     float32_t sum = 0.0f;
     int i;
 
-#ifdef __ARM_NEON
+#ifdef __ARM_NEON // NEON SIMD implementation.
     float32x4_t acc = vdupq_n_f32(0.0f);
     for (i = 0; i < dims; i += 4) {
         float32x4_t a = vld1q_f32(v1 + i);
@@ -55,7 +61,32 @@ float32_t euclidean_distance(float32_t *v1, float32_t *v2, int dims) {
         acc = vmlaq_f32(acc, diff, diff);
     }
     sum = vaddvq_f32(acc);
-#else
+
+#elif defined(__SSE__) //SSE SIMD implementation.
+
+__m128 acc = _mm_setzero_ps();
+for (i = 0; i < dims; i += 4)
+{
+    __m128 a = _mm_load_ps(v1 + i);
+    __m128 b = _mm_load1_ps(v2 + i);
+
+    //substraction
+    __m128 diff = _mm_sub_ps(a,b);
+
+    //Accumulates the squared differences of two vectors 
+    acc = _mm_add_ps(acc, _mm_mul_ps(diff, diff));
+
+}
+
+// Perform horizontal addition manually
+__m128 temp = _mm_add_ps(acc, _mm_movehl_ps(acc, acc));
+__m128 hadd = _mm_add_ss(temp, _mm_shuffle_ps(temp, temp, 1));
+
+//convert to a normal float
+sum = _mm_cvtss_f32(hadd);
+
+
+#else // Fallback 
     for (i = 0; i < dims; i++) {
         float32_t diff = v1[i] - v2[i];
         sum += diff * diff;
@@ -91,7 +122,7 @@ int euclidean_distance_best(float32_t a, float32_t b) {
  *       to avoid division by zero.
  */
 float32_t cosine_similarity(float32_t *v1, float32_t *v2, int dims) {
-    float32_t dot = 0.0f, norm1 = 0.0f, norm2 = 0.0f;
+    float32_t dot = 0.0f, norm1 = 0.0f, norm2 = 0.0f; 
     int i;
 
 #ifdef __ARM_NEON
@@ -111,6 +142,7 @@ float32_t cosine_similarity(float32_t *v1, float32_t *v2, int dims) {
     dot = vaddvq_f32(acc_dot);
     norm1 = sqrtf(vaddvq_f32(acc_norm1));
     norm2 = sqrtf(vaddvq_f32(acc_norm2));
+
 #else
     for (i = 0; i < dims; i++) {
         dot += v1[i] * v2[i];
