@@ -74,6 +74,27 @@ typedef struct {
     pthread_t thread;
 } ThreadData;
 
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <unistd.h>
+#endif
+
+int get_num_threads()
+{
+    int num_threads = 1; // Valor por defecto
+
+#ifdef _WIN32
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    num_threads = sysinfo.dwNumberOfProcessors;
+#else
+    num_threads = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+
+    return (num_threads > 0) ? num_threads : 1; // Asegurar que no sea 0
+}
+
 
 /*-------------------------------------------------------------------------------------*
  *                                PRIVATE FUNCTIONS                                    *
@@ -98,7 +119,7 @@ static IndexFlatMp *flat_mp_init(int method, uint16_t dims) {
         return NULL;
     }
     index->rr = 0;
-    index->threads = sysconf(_SC_NPROCESSORS_ONLN) / 2;
+    index->threads = get_num_threads();
     index->heads = calloc(index->threads, sizeof(INodeFlat *));
     index->elements = 0;
     index->dims = dims;
