@@ -28,7 +28,7 @@ int main() {
     
     
     // Crear el índice
-    Index *index = alloc_index(index_type, method, dims);
+    Index *index = alloc_index(index_type, method, dims, NULL);
     if (!index) {
         printf("Error: No se pudo asignar el índice.\n");
         return 1;
