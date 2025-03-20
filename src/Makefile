@@ -8,7 +8,7 @@ SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c 
 OBJS = $(SRCS:.c=.o)
 
 # Compiler flags (Optimized for ARMv8-A / AArch64)
-CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=armv8-a+simd -fPIC
+CFLAGS = -g -Wall -Wextra -O3 -march=armv8-a+simd -fPIC
 
 LDFLAGS = -lm -lpthread
 

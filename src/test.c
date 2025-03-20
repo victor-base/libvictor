@@ -6,7 +6,7 @@
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
-#define NUM_VECTORS 10000 // Cantidad de vectores a insertar
+#define NUM_VECTORS 100000 // Cantidad de vectores a insertar
 
 
 // Función auxiliar para generar vectores aleatorios en el rango [-1,1]
@@ -26,6 +26,7 @@ int main() {
     MatchResult result;
     float32_t vector[DIMS];
     
+    printf("%s\n", __LIB_VERSION());
     
     // Crear el índice
     Index *index = alloc_index(index_type, method, dims, NULL);
