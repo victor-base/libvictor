@@ -61,7 +61,6 @@
     #define OS "Unknown OS"
 #endif
 
-// 🔹 Detectar Arquitectura
 #if defined(__x86_64__) || defined(_M_X64)
     #define ARCH "x86_64"
 #elif defined(__aarch64__) || defined(_M_ARM64)
