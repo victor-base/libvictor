@@ -155,7 +155,7 @@ int destroy_index(Index **index) {
  */
 Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
     Index *idx = calloc_mem(1, sizeof(Index));
-    if (idx == NULL) 
+    if (idx == NULL || icontext != NULL) 
         return NULL;
 
     switch (type) {
