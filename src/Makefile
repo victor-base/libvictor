@@ -1,7 +1,9 @@
 # -- MAKEFILE EXCLUSIVO DE WINDOWS --
 
+# Iniciar el programa 1: make 2: ./runtest.exe
+
 # Nombre del ejecutable final
-EXEC = mi_programa
+EXEC = runtest
 
 # Archivos fuente
 SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c
