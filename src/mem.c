@@ -24,6 +24,7 @@
  * enabling better control and optimization of memory usage.
  */
 
+ #include "config.h"
  #include <stdio.h>
  #include <stdlib.h>
  

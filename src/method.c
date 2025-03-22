@@ -24,6 +24,7 @@
  * which are used to compare vectors efficiently.
  */
 
+ #include "config.h"
 #include "method.h"
 #include "math.h"
  

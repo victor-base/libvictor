@@ -1,36 +1,51 @@
-CC = gcc
+# This section is responsible for detecting the operating system.
+# It can be used to set OS-specific variables or perform OS-specific tasks.
 
-TARGET = testdb
+OS := $(shell uname -s 2>/dev/null || echo Windows_NT)
 
-LIBNAME = libvictor.so
+# Definir opciones según el SO
+
+ifeq ($(OS), Linux)
+    TARGET = testdb
+    LIBNAME = libvictor.so
+    CC = gcc
+    CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
+    LDFLAGS = -lm -lpthread
+
+else ifeq ($(OS), Windows_NT)
+    TARGET = testdb.exe
+    LIBNAME = libvictor.dll
+    CC = x86_64-w64-mingw32-gcc   # change if youre using any other compiler, Im using this one.
+    CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native
+    LDFLAGS = -lm -pthread
+
+else ifeq ($(OS), Darwin)
+	TARGET = testdb.macos
+	LIBNAME = libvictor.dylib
+	CC = gcc  
+	CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
+	LDFLAGS = -lm -lpthread
+
+endif
+
+# Source files & .obj instructiosm
 
 SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c
 OBJS = $(SRCS:.c=.o)
 
-# Compiler flags (Optimized for ARMv8-A / AArch64)
-CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=armv8-a+simd -fPIC
-
-LDFLAGS = -lm -lpthread
-
 all: $(TARGET) $(LIBNAME)
 
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJS) # Me genera el ejecutable (testdb.exe en Win) usando esta regla:
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LDFLAGS)
 
-%.o: %.c
+%.o: %.c # le digo al compilador como generar sus .obj a partir de los fuente
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(LIBNAME): index.o index_flat.o math.o mem.o method.o vector.o iflat_utils.o index_flat_mp.o
-	$(CC) -shared -o $(LIBNAME) index.o index_flat.o math.o mem.o iflat_utils.o index_flat_mp.o method.o vector.o $(LDFLAGS)
+$(LIBNAME): $(OBJS) # Creará la biblioteca compartida (libvictor.dll en Windows) usando la regla:
+	$(CC) -shared -o $(LIBNAME) $(OBJS) $(LDFLAGS)
 
-
+# Borro los archivos generados como los .obj y todos los generados en las variables
 clean:
-	rm -f $(OBJS) $(TARGET) $(LIBNAME)
+	rm -f $(OBJS) $(TARGET) $(LIBNAME) 
 
-check-neon:
-	@echo "Checking for NEON support..."
-	@$(CC) -dM -E - < /dev/null | grep -q "__ARM_NEON" && echo "NEON supported" || echo "NEON not supported"
-
-.PHONY: all clean check-neon
-
-
+.PHONY: all clean

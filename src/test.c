@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <time.h>
 #include "victor.h"
+#include "config.h"
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar

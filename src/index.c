@@ -36,6 +36,7 @@
 * Contact: emiliano.billi@gmail.com
 */
 
+#include "config.h"
 #include "victor.h"
 #include "mem.h"
 #include "index_flat.h"
