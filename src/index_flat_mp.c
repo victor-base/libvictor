@@ -88,6 +88,9 @@ typedef struct {
  *
  * @return Pointer to the initialized IndexFlat structure or NULL on failure.
  */
+
+
+// Posible refactor para incluir soporte en win mediante una funcion externa que busque el N° de CPUs
 static IndexFlatMp *flat_mp_init(int method, uint16_t dims) {
     IndexFlatMp *index = (IndexFlatMp *) calloc_mem(1,sizeof(IndexFlatMp));
     if (index == NULL)
