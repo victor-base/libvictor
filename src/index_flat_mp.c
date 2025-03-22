@@ -36,6 +36,7 @@
 * Contact: emiliano.billi@gmail.com
 */
 
+#include "config.h"
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -108,6 +109,9 @@ int get_num_threads()
  *
  * @return Pointer to the initialized IndexFlat structure or NULL on failure.
  */
+
+
+// Posible refactor para incluir soporte en win mediante una funcion externa que busque el N° de CPUs
 static IndexFlatMp *flat_mp_init(int method, uint16_t dims) {
     IndexFlatMp *index = (IndexFlatMp *) calloc_mem(1,sizeof(IndexFlatMp));
     if (index == NULL)

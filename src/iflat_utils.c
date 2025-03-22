@@ -1,4 +1,4 @@
-
+#include "config.h"
 #include "iflat_utils.h"
 #include "mem.h"
 #include "vector.h"

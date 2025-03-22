@@ -21,6 +21,7 @@
 
 #include <math.h>
 #include <stdint.h>
+#include "config.h"
 
 #ifdef __ARM_NEON
 #include <arm_neon.h>

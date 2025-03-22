@@ -36,6 +36,7 @@
 * Contact: emiliano.billi@gmail.com
 */
 
+#include "config.h"
 #define __LIB_CODE 1
 
 #include "victor.h"

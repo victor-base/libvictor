@@ -23,6 +23,7 @@
  * for the `Vector` structure used in the vector cache database.
  */
 
+ #include "config.h"
  #include "vector.h"
  #include "mem.h"
  #include <string.h>
