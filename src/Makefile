@@ -33,6 +33,11 @@ endif
 SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c
 OBJS = $(SRCS:.c=.o)
 
+# Compiler flags (Optimized for ARMv8-A / AArch64)
+CFLAGS = -g -Wall -Wextra -O3 -march=armv8-a+simd -fPIC
+
+LDFLAGS = -lm -lpthread
+
 all: $(TARGET) $(LIBNAME)
 
 $(TARGET): $(OBJS) # Me genera el ejecutable (testdb.exe en Win) usando esta regla:

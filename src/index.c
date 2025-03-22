@@ -37,10 +37,52 @@
 */
 
 #include "config.h"
+#define __LIB_CODE 1
+
 #include "victor.h"
 #include "mem.h"
 #include "index_flat.h"
 #include "index_flat_mp.h"
+
+#define __LIB_VERSION_MAJOR "0"
+#define __LIB_VERSION_MINOR "0"
+#define __LIB_VERSION_PATCH "1"
+
+#if defined(_WIN32) || defined(_WIN64)
+    #define OS "Windows"
+#elif defined(__APPLE__) || defined(__MACH__)
+    #define OS "macOS"
+#elif defined(__linux__)
+    #define OS "Linux"
+#elif defined(__unix__)
+    #define OS "Unix"
+#elif defined(__ANDROID__)
+    #define OS "Android"
+#else
+    #define OS "Unknown OS"
+#endif
+
+#if defined(__x86_64__) || defined(_M_X64)
+    #define ARCH "x86_64"
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    #define ARCH "ARM64"
+#elif defined(__arm__) || defined(_M_ARM)
+    #define ARCH "ARM"
+#elif defined(__i386__) || defined(_M_IX86)
+    #define ARCH "x86"
+#else
+    #define ARCH "Unknown Arch"
+#endif
+
+/**
+ * Returns the version of the library.
+ */
+const char *__LIB_VERSION() {
+    static const char version[] = "libvictor " __LIB_VERSION_MAJOR "." __LIB_VERSION_MINOR "." __LIB_VERSION_PATCH
+                                                " (" ARCH " - " OS ")"
+                                                " [" __DATE__ " " __TIME__ "]";
+    return version;
+}
 
 int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult **results, int n) {
     if (!index || !index->data || !index->search_n)
@@ -111,9 +153,9 @@ int destroy_index(Index **index) {
  *
  * @return Pointer to the allocated index or NULL on failure.
  */
-Index *alloc_index(int type, int method, uint16_t dims) {
+Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
     Index *idx = calloc_mem(1, sizeof(Index));
-    if (idx == NULL) 
+    if (idx == NULL || icontext != NULL) 
         return NULL;
 
     switch (type) {

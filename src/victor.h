@@ -110,6 +110,9 @@ typedef struct {
 
 } Index;
 
+#ifndef _LIB_CODE
+extern const char *__LIB_VERSION();
+
 /**
  * Wrapper functions to call the corresponding method in `Index`.
  * These functions ensure safe access and provide a unified interface.
@@ -119,7 +122,8 @@ extern int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *r
 extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
 extern int delete(Index *index, uint64_t id);
 
-extern Index *alloc_index(int type, int method, uint16_t dims);
+extern Index *alloc_index(int type, int method, uint16_t dims, void *icontext);
 extern int destroy_index(Index **index);
+#endif
 
 #endif // __VICTOR_H
