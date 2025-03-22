@@ -10,31 +10,22 @@ ifeq ($(OS), Linux)
     LIBNAME = libvictor.so
     CC = gcc
     CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
-    LDFLAGS = -lm -lpthread
-
 else ifeq ($(OS), Windows_NT)
     TARGET = testdb.exe
     LIBNAME = libvictor.dll
     CC = x86_64-w64-mingw32-gcc   # change if youre using any other compiler, Im using this one.
     CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native
-    LDFLAGS = -lm -pthread
-
 else ifeq ($(OS), Darwin)
 	TARGET = testdb.macos
 	LIBNAME = libvictor.dylib
 	CC = gcc  
 	CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
-	LDFLAGS = -lm -lpthread
-
 endif
 
 # Source files & .obj instructiosm
 
 SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c
 OBJS = $(SRCS:.c=.o)
-
-# Compiler flags (Optimized for ARMv8-A / AArch64)
-CFLAGS = -g -Wall -Wextra -O3 -march=armv8-a+simd -fPIC
 
 LDFLAGS = -lm -lpthread
 
