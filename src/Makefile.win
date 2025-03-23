@@ -1,6 +1,6 @@
 # -- MAKEFILE EXCLUSIVO DE WINDOWS --
 
-# Iniciar el programa 1: make 2: ./runtest.exe
+# Iniciar el programa 1: make -f Makefile.win 2: ./runtest.exe, Limpiar los .obj: make -f Makefile.win clean
 
 # Nombre del ejecutable final
 EXEC = runtest
