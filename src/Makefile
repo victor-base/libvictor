@@ -10,11 +10,6 @@ ifeq ($(OS), Linux)
     LIBNAME = libvictor.so
     CC = gcc
     CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
-else ifeq ($(OS), Windows_NT)
-    TARGET = testdb.exe
-    LIBNAME = libvictor.dll
-    CC = x86_64-w64-mingw32-gcc   # change if youre using any other compiler, Im using this one.
-    CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native
 else ifeq ($(OS), Darwin)
 	TARGET = testdb.macos
 	LIBNAME = libvictor.dylib
