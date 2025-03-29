@@ -7,7 +7,7 @@
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
-#define NUM_VECTORS 1000000
+#define NUM_VECTORS 4000000
 
 // Cantidad de vectores a insertar
 
@@ -21,12 +21,12 @@ void generate_random_vector(float32_t *vector, uint16_t dims) {
 
 int main() {
     srand(time(NULL)); // Inicializar la semilla de números aleatorios
-    time_t start, end;
+    struct timespec start, end;
     // Parámetros del índice
-    int index_type = FLAT_INDEX;
+    int index_type = FLAT_INDEX_MP;
     int method = COSINE; // Método de prueba
     uint16_t dims = DIMS;
-    MatchResult *result;
+    MatchResult result;
     float32_t vector[DIMS];
     
     printf("%s\n", __LIB_VERSION());
@@ -52,21 +52,22 @@ int main() {
     
     printf("Se han insertado %d vectores correctamente.\n", NUM_VECTORS);
 	fflush(stdout);
-    start = clock();
-    if (search_n(index, vector, dims, &result, 10) != 0) {
+	clock_gettime(CLOCK_MONOTONIC, &start);
+    if (search(index, vector, dims, &result) != 0) {
         printf("Error en la búsqueda.\n");
         return 1;
     }
-    end = clock();
-    printf("Tiempo de búsqueda: %f segundos\n", (double)(end - start) / CLOCKS_PER_SEC);
+	clock_gettime(CLOCK_MONOTONIC, &end);
+// Calcular diferencia en milisegundos
+	double elapsed_ms = (end.tv_sec - start.tv_sec) * 1000.0;
+	elapsed_ms += (end.tv_nsec - start.tv_nsec) / 1.0e6;
+
+	printf("Búsqueda completada en %.3f ms\n", elapsed_ms);
 	fflush(stdout);
     // Mostrar resultados
     printf("Búsqueda completada.\n");
-    printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[0].id, result[0].distance);
-	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[1].id, result[1].distance);
-	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[2].id, result[2].distance);
-	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[3].id, result[3].distance);
-	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[9].id, result[9].distance);
+
+	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result.id, result.distance);
     destroy_index(&index);
 
     printf("Prueba finalizada correctamente.\n");
