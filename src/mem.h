@@ -29,5 +29,8 @@ extern void *realloc_mem(void *__ptr, size_t __size);
 
 extern void free_mem(void *__mem);
 
+extern void *aligned_calloc_mem(size_t alignment, size_t size);
+
+extern void free_aligned_mem(void *ptr);
 
 #endif

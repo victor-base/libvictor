@@ -26,7 +26,7 @@ int main() {
     int index_type = FLAT_INDEX;
     int method = COSINE; // Método de prueba
     uint16_t dims = DIMS;
-    MatchResult result;
+    MatchResult *result;
     float32_t vector[DIMS];
     
     printf("%s\n", __LIB_VERSION());
@@ -51,18 +51,25 @@ int main() {
     }
     
     printf("Se han insertado %d vectores correctamente.\n", NUM_VECTORS);
+	fflush(stdout);
     start = clock();
-    if (search(index, vector, dims, &result) != 0) {
+    if (search_n(index, vector, dims, &result, 10) != 0) {
         printf("Error en la búsqueda.\n");
         return 1;
     }
     end = clock();
     printf("Tiempo de búsqueda: %f segundos\n", (double)(end - start) / CLOCKS_PER_SEC);
+	fflush(stdout);
     // Mostrar resultados
     printf("Búsqueda completada.\n");
-    printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result.id, result.distance);
+    printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[0].id, result[0].distance);
+	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[1].id, result[1].distance);
+	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[2].id, result[2].distance);
+	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[3].id, result[3].distance);
+	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[9].id, result[9].distance);
     destroy_index(&index);
 
     printf("Prueba finalizada correctamente.\n");
+	getchar();
     return 0;
 }

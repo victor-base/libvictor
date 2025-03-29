@@ -167,6 +167,7 @@ static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
     INodeFlat *current;
     float32_t *v;
     int allocated = 0;
+	int ret;
 
     if (index == NULL) 
         return INVALID_INDEX;
@@ -204,13 +205,12 @@ static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
         return INDEX_EMPTY;
     }
 
-    flat_linear_search_n(current, v, idx->dims_aligned, *result, n, idx->cmp);
+    ret = flat_linear_search_n(current, v, idx->dims_aligned, *result, n, idx->cmp);
 
     pthread_rwlock_unlock(&idx->rwlock);
     if (allocated)
         free_mem(v);
-    return SUCCESS;
-
+    return ret;
 }
 
 

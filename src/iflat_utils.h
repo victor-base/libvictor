@@ -92,6 +92,6 @@ extern void flat_linear_search(INodeFlat *current, float32_t *v, uint16_t dims_a
  * @param n            - Number of top matches to find.
  * @param cmp          - Pointer to the CmpMethod structure that defines the comparison functions.
  */
-extern void flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp);
+extern int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp);
 
 #endif

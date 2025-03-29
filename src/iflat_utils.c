@@ -3,7 +3,8 @@
 #include "mem.h"
 #include "vector.h"
 #include "method.h"
-
+#include "heap.h"
+#include "panic.h"
 
 /*
  * insert_node - Inserts a new node at the head of the list.
@@ -73,28 +74,6 @@ int delete_node(INodeFlat **head, uint64_t id) {
 }
 
 /*
- * shift_right_mr - Shifts elements to the right in a MatchResult array.
- *
- * This function shifts elements in a MatchResult array one position to the right.
- * It is used when inserting a new match into a sorted list of nearest neighbors,
- * ensuring that the new element is inserted in the correct position while
- * preserving the order of the previous elements.
- *
- * Steps:
- * 1. Start from the last element in the array and move each element one position to the right.
- * 2. Continue shifting elements until reaching the beginning of the array.
- *
- * @param result - Pointer to the MatchResult array.
- * @param len    - Number of elements to shift.
- */
-static void shift_right_mr(MatchResult *result, int len) {
-    int i;
-    for (i = len-1; i > 0; i--)
-        result[i] = result[i-1];
-    return;
-}
-
-/*
  * flat_linear_search - Performs a linear search for the best match in a flat index.
  *
  * This function iterates through a linked list of indexed vectors, comparing each one
@@ -152,24 +131,46 @@ void flat_linear_search(INodeFlat *current, float32_t *v, uint16_t dims_aligned,
  * @param result       - Pointer to an array of MatchResult structures to store the top-N matches.
  * @param n            - Number of top matches to find.
  * @param cmp          - Pointer to the CmpMethod structure that defines the comparison functions.
+ * @return SYSTEM_ERROR or SUCESS
  */
-void flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp) {
-    float32_t distance;
-    int i, k;
+int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp) {
+	Heap heap;
+    HeapNode node;
+	float32_t distance;
+    
+	if (init_heap(&heap, HEAP_MIN, n, cmp->is_better_match) == HEAP_ERROR_ALLOC)
+		return SYSTEM_ERROR;
+	
+	int i, k;
     for (i = 0; i < n; i++) {
         result[i].distance = cmp->worst_match_value;
         result[i].id = 0;
     }
     while (current) {
         distance = cmp->compare_vectors(current->vector->vector, v, dims_aligned);
-        for (k = 0; k < n; k++) {
-            if (cmp->is_better_match(distance, result[k].distance)) {
-                shift_right_mr(&result[k], n - k - 1);
-                result[k].distance = distance;
-                result[k].id = current->vector->id;
-                break;
-            }
-        }
+
+		if (heap_full(&heap)) {
+			PANIC_IF(heap_peek(&heap, &node) == HEAP_ERROR_EMPTY, "peek on empty heap");
+			if (cmp->is_better_match(distance, node.distance)) {
+				node.node = current;
+				node.distance = distance;
+				PANIC_IF(heap_replace(&heap, &node) == HEAP_ERROR_EMPTY, "replace on empty heap");
+			}
+		} else {
+			node.node = current;
+			node.distance = distance;
+			PANIC_IF(heap_insert(&heap, &node) == HEAP_ERROR_FULL, "insert on full heap");
+		}
         current = current->next;
     }
+
+	k = heap_size(&heap);
+	for (k = heap_size(&heap); k > 0; k = heap_size(&heap)) {
+		heap_pop(&heap, &node);
+		result[k-1].distance = node.distance;
+		result[k-1].id = ((INodeFlat *)node.node)->vector->id;
+	}
+
+	heap_destroy(&heap);
+	return SUCCESS;
 }

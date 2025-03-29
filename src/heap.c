@@ -18,6 +18,7 @@
  *
  * Contact: emiliano.billi@gmail.com
  */
+#include "panic.h"
 #include "heap.h"
 
 /**
@@ -29,8 +30,8 @@
 static int resize_heap(Heap *h) {
 	HeapNode *tmp;
 	size_t   hsz;
-	if (!h || !h->heap) 
-		return HEAP_ERROR_NULL;
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(h->heap == NULL, "h->heap is NULL");
 
 	if (h->m_size == NOLIMIT_HEAP) {
 		hsz = 2 * h->c_size;
@@ -57,13 +58,13 @@ static void swap(HeapNode *a, HeapNode *b) {
  * Restores the heap invariant by moving the root element down.
  *
  * @param h Pointer to the heap.
- * @return HEAP_SUCCESS or HEAP_ERROR_NULL on invalid input.
+ * @return HEAP_SUCCESS.
  */
 static int heapify_down(Heap *h) {
     int i = 0;
 
-	if (!h || !h->heap)
-    	return HEAP_ERROR_NULL;
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(h->heap == NULL, "h->heap is NULL");
 
 	if (h->e == 0)
     	return HEAP_SUCCESS;
@@ -103,13 +104,13 @@ static int heapify_down(Heap *h) {
  * Restores the heap invariant by moving the last inserted element up.
  *
  * @param h Pointer to the heap.
- * @return HEAP_SUCCESS or HEAP_ERROR_NULL on invalid input.
+ * @return HEAP_SUCCESS.
  */
 static int heapify_up(Heap *h) {
     int i;
 	
-	if (!h || !h->heap)
-    	return HEAP_ERROR_NULL;
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(h->heap == NULL, "h->heap is NULL");
 
 	if (h->e == 0)
     	return HEAP_SUCCESS;
@@ -147,8 +148,13 @@ static int heapify_up(Heap *h) {
  * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_EMPTY).
  */
 int heap_peek(Heap *h, HeapNode *node) {
-    if (h == NULL || h->e == 0 || node == NULL)
-        return HEAP_ERROR_NULL;
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(h->heap == NULL, "h->heap is NULL");
+	PANIC_IF(node == NULL, "node is null");
+
+	if (h->e == 0)
+		return HEAP_ERROR_EMPTY;
+
     *node = h->heap[0];
     return HEAP_SUCCESS;
 }
@@ -162,8 +168,13 @@ int heap_peek(Heap *h, HeapNode *node) {
  * @return HEAP_SUCCESS on success, or an error code.
  */
 int heap_replace(Heap *h, const HeapNode *node) {
-    if (!h || !h->heap || h->e == 0 || !node)
-        return HEAP_ERROR_NULL;
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(h->heap == NULL, "h->heap is NULL");
+	PANIC_IF(node == NULL, "node is null");
+
+	if (h->e == 0)
+		return HEAP_ERROR_EMPTY;
+
     h->heap[0] = *node;
     return heapify_down(h);
 }
@@ -176,9 +187,13 @@ int heap_replace(Heap *h, const HeapNode *node) {
  * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_EMPTY).
  */
 int heap_pop(Heap *h, HeapNode *node) {
-	if (!h || !h->heap || h->e == 0 || !node) 
-		return HEAP_ERROR_NULL;
-	
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(h->heap == NULL, "h->heap is NULL");
+	PANIC_IF(node == NULL, "node is null");
+
+	if (h->e == 0)
+		return HEAP_ERROR_EMPTY;
+
 	*node = h->heap[0];
 	h->heap[0] = h->heap[--(h->e)];
 	return h->e == 0 ? HEAP_SUCCESS : heapify_down(h);
@@ -189,11 +204,13 @@ int heap_pop(Heap *h, HeapNode *node) {
  *
  * @param h Pointer to the heap.
  * @param node Pointer to the node to insert.
- * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_FULL, HEAP_ERROR_NULL).
+ * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_FULL).
  */
 int heap_insert(Heap *h, const HeapNode *node) {
-	if (!h || !h->heap || !node)
-		return HEAP_ERROR_NULL;
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(h->heap == NULL, "h->heap is NULL");
+	PANIC_IF(node == NULL, "node is null");
+
 
 	if (h->e == h->c_size) {
 		if (h->c_size == h->m_size)
@@ -216,14 +233,14 @@ int heap_insert(Heap *h, const HeapNode *node) {
  * @param type HEAP_MIN or HEAP_MAX, determines the comparison behavior.
  * @param max_size Maximum number of elements allowed (use NOLIMIT_HEAP for unbounded).
  * @param cmp Pointer to a comparison function: returns true if the first argument is a better match.
- * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_NULL, HEAP_ERROR_ALLOC).
+ * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_ALLOC).
  */
 int init_heap(Heap *h, int type, int max_size, int (*cmp)(float32_t, float32_t)) {
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(cmp == NULL, "comparator cmp is NULL");
+
 	if (type != HEAP_MAX && type != HEAP_MIN)
 		return HEAP_ERROR_INVALID_TYPE;
-
-	if (!h || !cmp)
-		return HEAP_ERROR_NULL;
 
 	if (max_size < 0 && max_size != NOLIMIT_HEAP)
 		return HEAP_ERROR_UNSUPPORTED;
@@ -240,27 +257,39 @@ int init_heap(Heap *h, int type, int max_size, int (*cmp)(float32_t, float32_t))
     return HEAP_SUCCESS;
 }
 
+void heap_destroy(Heap *h) {
+	if ( h && h->heap) {
+		free_mem(h->heap);
+		h->e = 0;
+		h->c_size = 0;
+		h->m_size = 0;
+		h->type = 0;
+		h->is_better_match = NULL;
+	}
+}
 
 /**
  * Returns the number of elements currently in the heap.
  *
  * @param h Pointer to the heap.
- * @return Heap size, or HEAP_ERROR_NULL if h is NULL.
+ * @return Heap size.
  */
 
 int heap_size(Heap *h) {
-    return h == NULL ? HEAP_ERROR_NULL : h->e;
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(h->heap == NULL, "h->heap is NULL");
+    return h->e;
 }
 
 /**
  * Checks whether the heap is full.
  *
  * @param h Pointer to the heap.
- * @return 0 if not full, 1 if full, or HEAP_ERROR_NULL if h is invalid.
+ * @return 0 if not full, 1 if full
  */
 int heap_full(Heap *h) {
-	if (!h || !h->heap)
-		return HEAP_ERROR_NULL;
+	PANIC_IF(h == NULL, "h is NULL");
+	PANIC_IF(h->heap == NULL, "h->heap is NULL");
 
 	if (h->m_size == NOLIMIT_HEAP || h->e < h->m_size) 
 		return 0;

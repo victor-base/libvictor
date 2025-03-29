@@ -43,10 +43,10 @@ typedef struct {
     int (*is_better_match) (float32_t, float32_t);
     
     HeapNode *heap;
-    size_t   c_size;    /* Current size */
-    int      m_size;    /* Max size     */
-    int      type;		/* Heap Type    */
-    int      e;         /* Number of elements in the heap */
+    int c_size;    /* Current size */
+    int m_size;    /* Max size     */
+    int type;		/* Heap Type    */
+    int e;         /* Number of elements in the heap */
 } Heap;
 
 typedef enum {
@@ -70,7 +70,7 @@ typedef enum {
  * @param type HEAP_MIN or HEAP_MAX, determines the comparison behavior.
  * @param max_size Maximum number of elements allowed (use NOLIMIT_HEAP for unbounded).
  * @param cmp Pointer to a comparison function: returns true if the first argument is a better match.
- * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_NULL, HEAP_ERROR_ALLOC).
+ * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_ALLOC).
  */
 extern int init_heap(Heap *h, int type, int max_size, int (*cmp)(float32_t, float32_t));
 
@@ -81,7 +81,7 @@ extern int init_heap(Heap *h, int type, int max_size, int (*cmp)(float32_t, floa
  * Returns the number of elements currently in the heap.
  *
  * @param h Pointer to the heap.
- * @return Heap size, or HEAP_ERROR_NULL if h is NULL.
+ * @return Heap size.
  */
 extern int heap_size(Heap *h);
 
@@ -89,7 +89,7 @@ extern int heap_size(Heap *h);
  * Checks whether the heap is full.
  *
  * @param h Pointer to the heap.
- * @return 0 if not full, 1 if full, or HEAP_ERROR_NULL if h is invalid.
+ * @return 0 if not full, 1 if full.
  */
 extern int heap_full(Heap *h);
 
@@ -101,7 +101,7 @@ extern int heap_full(Heap *h);
  *
  * @param h Pointer to the heap.
  * @param node Pointer to the node to insert.
- * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_FULL, HEAP_ERROR_NULL).
+ * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_FULL).
  */
 extern int heap_insert(Heap *h, const HeapNode *node);
 
@@ -132,5 +132,8 @@ extern int heap_pop(Heap *h, HeapNode *node);
  * @return HEAP_SUCCESS on success, or an error code (e.g., HEAP_ERROR_EMPTY).
  */
 extern int heap_peek(Heap *h, HeapNode *node);
+
+
+extern void heap_destroy(Heap *h);
 
 #endif

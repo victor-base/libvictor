@@ -24,9 +24,10 @@
  * enabling better control and optimization of memory usage.
  */
 
- #include "config.h"
- #include <stdio.h>
- #include <stdlib.h>
+#include "config.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
  
  /**
   * Allocates memory for an array of `__count` elements of `__size` bytes each.
@@ -54,4 +55,47 @@ void free_mem(void *__mem) {
 }
 
 
- 
+ /**
+ * Allocates zero-initialized, aligned memory.
+ *
+ * This function returns memory aligned to `alignment` bytes,
+ * and ensures the entire block is zeroed like `calloc`.
+ *
+ * On POSIX systems, uses `posix_memalign`.
+ * On Windows, uses `_aligned_malloc` + `memset`.
+ *
+ * @param alignment Byte alignment (must be power of two).
+ * @param size      Total number of bytes to allocate.
+ * @return Pointer to zero-initialized aligned memory, or NULL on failure.
+ */
+void *aligned_calloc_mem(size_t alignment, size_t size) {
+	void *ptr = NULL;
+
+#if defined(_WIN32)
+	ptr = _aligned_malloc(size, alignment);
+	if (ptr) memset(ptr, 0, size);
+#elif defined(__APPLE__) || defined(__linux__) || defined(__unix__)
+	if (posix_memalign(&ptr, alignment, size) == 0)
+		memset(ptr, 0, size);
+	else
+		ptr = NULL;
+#else
+	#error "aligned_calloc_mem is not supported on this platform"
+#endif
+
+	return ptr;
+}
+
+/**
+ * Frees memory allocated by aligned_calloc_mem.
+ * Uses the appropriate deallocator per platform.
+ *
+ * @param ptr Pointer to memory previously allocated with aligned_calloc_mem.
+ */
+void free_aligned_mem(void *ptr) {
+#if defined(_WIN32)
+	_aligned_free(ptr);
+#else
+	free(ptr);
+#endif
+}
