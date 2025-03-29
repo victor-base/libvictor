@@ -25,6 +25,9 @@
 
 extern void *calloc_mem(size_t __count, size_t __size);
 
+extern void *realloc_mem(void *__ptr, size_t __size);
+
 extern void free_mem(void *__mem);
+
 
 #endif

@@ -1,0 +1,68 @@
+.TH LIBVICTOR 3 "March 2025" "libvictor RC1" "C Library Manual"
+.SH NAME
+libvictor \- In-memory vector index library with C ABI
+
+.SH SYNOPSIS
+.B #include <victor.h>
+
+.BI "int search(Index *" index ", float32_t *" vector ", uint16_t " dims ", MatchResult *" result );
+.br
+.BI "int search_n(Index *" index ", float32_t *" vector ", uint16_t " dims ", MatchResult **" results ", int " n );
+.br
+.BI "int insert(Index *" index ", uint64_t " id ", float32_t *" vector ", uint16_t " dims );
+.br
+.BI "int delete(Index *" index ", uint64_t " id );
+.br
+.BI "Index* alloc_index(int " type ", int " method ", uint16_t " dims ", void *" context );
+.br
+.BI "int destroy_index(Index **" index );
+
+.SH DESCRIPTION
+libvictor is a high-performance C library for managing in-memory vector indexes, such as Flat and HNSW. 
+It exposes a minimal C ABI with consistent function signatures that support insertion, deletion, allocation and vector search.
+
+.SH TYPES
+
+.TP
+.B MatchResult
+Structure returned by search queries:
+.nf
+    typedef struct {
+        int id;
+        float distance;
+    } MatchResult;
+.fi
+
+.TP
+.B ErrorCode
+Enum representing common error codes:
+.nf
+    SUCCESS, INVALID_INIT, INVALID_INDEX, INVALID_VECTOR,
+    INVALID_RESULT, INVALID_DIMENSIONS, INVALID_ID,
+    INDEX_EMPTY, SYSTEM_ERROR
+.fi
+
+.TP
+.B Comparison Methods
+.nf
+    #define L2NORM 0x00  // Euclidean Distance
+    #define COSINE 0x01  // Cosine Similarity
+.fi
+
+.TP
+.B Index Types
+.nf
+    #define FLAT_INDEX    0x00
+    #define FLAT_INDEX_MP 0x01
+    #define NSW_INDEX     0x02
+    #define HNSW_INDEX    0x03
+.fi
+
+.SH RETURN VALUES
+Most functions return 0 on success or a negative integer from the ErrorCode enum on failure.
+
+.SH SEE ALSO
+victord(1)
+
+.SH AUTHOR
+Emiliano A. Billi <emiliano.billi@gmail.com>

@@ -58,6 +58,9 @@ typedef enum {
 
 #define FLAT_INDEX    0x00
 #define FLAT_INDEX_MP 0x01
+#define NSW_INDEX     0x02 // Not implemented yet
+#define HNSW_INDEX    0x03 // Not implemented yet
+
 /**
  * Structure representing an abstract index for vector search.
  * It supports multiple indexing strategies through function pointers.
