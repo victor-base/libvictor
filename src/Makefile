@@ -39,4 +39,8 @@ $(LIBNAME): $(OBJS) # Creará la biblioteca compartida (libvictor.dll en Windows
 clean:
 	rm -f $(OBJS) $(TARGET) $(LIBNAME) 
 
+install:
+	cp libvictor.dylib /usr/local/lib/
+	mkdir -p /usr/local/include/victor && cp victor.h /usr/local/include/victor/
+
 .PHONY: all clean
