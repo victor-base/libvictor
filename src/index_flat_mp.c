@@ -172,41 +172,6 @@ static int flat_delete_mp(void *index, uint64_t id) {
 }
 
 
-/*
- * flat_search_n - Searches for the top-N closest vectors in the flat index.
- *
- * This function performs a nearest neighbor search in a linked list-based
- * flat index, returning the top-N closest matches to the given query vector.
- * 
- * Steps:
- * 1. Validate input parameters.
- * 2. Allocate memory for storing the top-N matches.
- * 3. If necessary, allocate an aligned copy of the query vector.
- * 4. Acquire a read lock to ensure thread safety.
- * 5. Traverse the list and compute distances between stored vectors and the query vector.
- * 6. Maintain a sorted list of the N best matches found.
- * 7. Release the read lock.
- * 8. Free allocated memory if applicable.
- *
- * @param index  - Pointer to the flat index (`IndexFlat`).
- * @param vector - Pointer to the query vector.
- * @param dims   - Number of dimensions of the query vector.
- * @param result - Pointer to a pointer that will store an array of `MatchResult` containing the N best matches.
- * @param n      - Number of top matches to retrieve.
- *
- * @return SUCCESS if matches are found.
- *         INVALID_INDEX if the index pointer is NULL.
- *         INVALID_VECTOR if the vector pointer is NULL.
- *         INVALID_DIMENSIONS if the vector dimensions do not match the index.
- *         INVALID_RESULT if the result pointer is NULL.
- *         SYSTEM_ERROR if memory allocation fails.
- *         INDEX_EMPTY if no elements exist in the index.
- */
-static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, MatchResult **result, int n) {
-    return SYSTEM_ERROR;
-}
-
-
 
 /*
  * search_mp_thread - Thread function for parallel nearest neighbor search.
@@ -220,6 +185,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
 void *search_mp_thread(void *arg) {
     ThreadData *data = (ThreadData *)arg;
     flat_linear_search(data->head, data->vector, data->dims, data->result, data->cmp);
+	return NULL;
 }
 
 /*
@@ -255,8 +221,6 @@ void *search_mp_thread(void *arg) {
 static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchResult *result) {
     IndexFlatMp *idx = (IndexFlatMp *)index;
     ThreadData *data;
-    float32_t *v;
-    int allocated = 0;
     int i;
 
     // Validate input parameters
@@ -269,24 +233,12 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
     if (result == NULL)
         return INVALID_RESULT;
 
-    // Allocate aligned memory for the vector if needed
-    if (dims < idx->dims_aligned) {
-        v = (float32_t *)calloc_mem(1, idx->dims_aligned * sizeof(float32_t));
-        if (v == NULL)
-            return SYSTEM_ERROR;
-        allocated = 1;
-        memcpy(v, vector, dims * sizeof(float32_t));
-    } else {
-        v = vector;
-    }
+   
 
     // Allocate memory for thread data
     data = (ThreadData *)calloc_mem(idx->threads, sizeof(ThreadData));
-    if (data == NULL) {
-        if (allocated)
-            free_mem(v);
+    if (data == NULL) 
         return SYSTEM_ERROR;
-    }
 
     // Initialize the result with the worst possible match value
     result->distance = idx->cmp->worst_match_value;
@@ -297,16 +249,29 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
     
     // Create and launch threads for multi-threaded searching
     for (i = 0; i < idx->threads; i++) {
-        data[i].vector = v;
-        data[i].dims = idx->dims_aligned;
-        
-        // Allocate memory for individual thread results
-        data[i].result = (MatchResult *)calloc_mem(1, sizeof(MatchResult));
-        data[i].cmp = idx->cmp;
-        data[i].head = idx->heads[i];
+		// Allocate aligned memory for the vector if needed
+		data[i].vector = (float32_t *)   aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
+        data[i].result = (MatchResult *) calloc_mem(1, sizeof(MatchResult));
 
-        pthread_create(&data[i].thread, NULL, search_mp_thread, &data[i]);
+		if (!data[i].vector || !data[i].result) {
+			// Clean up previous allocations
+			for (int j = 0; j <= i; j++) {
+				if (data[j].vector) free_aligned_mem(data[j].vector);
+				if (data[j].result) free_mem(data[j].result);
+			}
+			free_mem(data);
+			pthread_rwlock_unlock(&idx->rwlock);
+			return SYSTEM_ERROR;
+		}
+		memcpy(data[i].vector, vector, dims * sizeof(float32_t));
+		data[i].dims = idx->dims_aligned;
+        data[i].cmp  = idx->cmp;
+        data[i].head = idx->heads[i];        
     }
+
+	for (i= 0; i < idx->threads; i++) {
+		pthread_create(&data[i].thread, NULL, search_mp_thread, &data[i]);
+	}
 
     // Wait for all threads to complete and merge the best results
     for (i = 0; i < idx->threads; i++) {
@@ -318,6 +283,7 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
             result->distance = data[i].result->distance;
         }
 
+		free_aligned_mem(data[i].vector);
         // Free memory allocated for individual thread results
         free_mem(data[i].result);
     }
@@ -327,10 +293,6 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
 
     // Release the read lock
     pthread_rwlock_unlock(&idx->rwlock);
-
-    // Free allocated vector memory if it was created
-    if (allocated)
-        free_mem(v);
 
     return SUCCESS;
 }
@@ -459,7 +421,7 @@ int flat_index_mp(Index *idx, int method, uint16_t dims) {
     idx->name     = "flat_mp";
     idx->context  = NULL;
     idx->search   = flat_search_mp;
-    idx->search_n = flat_search_n_mp;
+    idx->search_n = NULL;
     idx->insert   = flat_insert_mp;
     idx->delete   = flat_delete_mp;
     idx->_release = flat_release_mp;

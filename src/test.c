@@ -7,7 +7,7 @@
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
-#define NUM_VECTORS 4000000
+#define NUM_VECTORS 2000000
 
 // Cantidad de vectores a insertar
 
@@ -23,10 +23,10 @@ int main() {
     srand(time(NULL)); // Inicializar la semilla de números aleatorios
     struct timespec start, end;
     // Parámetros del índice
-    int index_type = FLAT_INDEX_MP;
+    int index_type = FLAT_INDEX;
     int method = COSINE; // Método de prueba
     uint16_t dims = DIMS;
-    MatchResult result;
+    MatchResult *result;
     float32_t vector[DIMS];
     
     printf("%s\n", __LIB_VERSION());
@@ -53,8 +53,10 @@ int main() {
     printf("Se han insertado %d vectores correctamente.\n", NUM_VECTORS);
 	fflush(stdout);
 	clock_gettime(CLOCK_MONOTONIC, &start);
-    if (search(index, vector, dims, &result) != 0) {
-        printf("Error en la búsqueda.\n");
+	result = calloc(10, sizeof(MatchResult));
+	int ret;
+    if ((ret = search(index, vector, dims, result)) != 0) {
+        printf("Error en la búsqueda. %d\n", ret);
         return 1;
     }
 	clock_gettime(CLOCK_MONOTONIC, &end);
@@ -67,7 +69,9 @@ int main() {
     // Mostrar resultados
     printf("Búsqueda completada.\n");
 
-	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result.id, result.distance);
+	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[0].id, result[0].distance);
+	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[1].id, result[1].distance);
+	printf("Vector más cercano encontrado: ID = %d, Distancia = %f\n", result[2].id, result[2].distance);
     destroy_index(&index);
 
     printf("Prueba finalizada correctamente.\n");

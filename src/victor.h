@@ -79,7 +79,7 @@ typedef struct {
      * @param n The number of matches to retrieve.
      * @return The number of matches found, or -1 on error.
      */
-    int (*search_n)(void *, float32_t *, uint16_t, MatchResult **, int);
+    int (*search_n)(void *, float32_t *, uint16_t, MatchResult *, int);
 
     /**
      * Searches for the best match to the given vector.
@@ -120,7 +120,7 @@ extern const char *__LIB_VERSION();
  * Wrapper functions to call the corresponding method in `Index`.
  * These functions ensure safe access and provide a unified interface.
  */
-extern int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult **results, int n);
+extern int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *results, int n);
 extern int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result);
 extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
 extern int delete(Index *index, uint64_t id);

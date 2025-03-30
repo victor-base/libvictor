@@ -35,10 +35,10 @@
   * Structure representing a vector with an identifier and a dynamically
   * sized floating-point array.
   */
- typedef struct {
-     uint64_t id;       // Unique identifier for the vector
-     float32_t vector[]; // Flexible array member for storing float values
- } Vector;
+typedef struct {
+	uint64_t id;        // Unique identifier for the vector
+	float32_t vector[]; // Flexible array member for storing float values
+} Vector;
  
  /**
   * Allocates and initializes a new `Vector` structure.

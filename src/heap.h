@@ -45,7 +45,7 @@ typedef struct {
     HeapNode *heap;
     int c_size;    /* Current size */
     int m_size;    /* Max size     */
-    int type;		/* Heap Type    */
+    int type;	   /* Heap Type    */
     int e;         /* Number of elements in the heap */
 } Heap;
 

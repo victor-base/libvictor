@@ -84,7 +84,7 @@ const char *__LIB_VERSION() {
     return version;
 }
 
-int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult **results, int n) {
+int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *results, int n) {
     if (!index || !index->data || !index->search_n)
         return INVALID_INIT;
     return index->search_n(index->data, vector, dims, results, n);

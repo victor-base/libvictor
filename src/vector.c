@@ -42,7 +42,6 @@ Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims) {
     
 
 	vector = (Vector *) aligned_calloc_mem(16,sizeof(Vector) + (dims_aligned * sizeof(float32_t)));
-    //vector = (Vector *) calloc_mem(1, sizeof(Vector) + (dims_aligned * sizeof(float32_t)));
     if (vector && src) {
         memcpy(vector->vector, src, dims * sizeof(float32_t));
         vector->id = id;
@@ -58,7 +57,6 @@ Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims) {
  */
 void free_vector(Vector **vector) {
     if (vector && *vector) {
-        //free_mem(*vector);
 		free_aligned_mem(*vector);
 		*vector = NULL;
     }
