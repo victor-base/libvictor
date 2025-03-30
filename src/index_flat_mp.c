@@ -188,6 +188,13 @@ void *search_mp_thread(void *arg) {
 	return NULL;
 }
 
+static void free_thread_data(ThreadData *data, int up_to) {
+	for (int j = 0; j <= up_to; j++) {
+		if (data[j].vector) free_aligned_mem(data[j].vector);
+		if (data[j].result) free_mem(data[j].result);
+	}
+}
+
 /*
  * flat_search_mp - Multi-threaded nearest neighbor search in a flat index.
  *
@@ -233,19 +240,15 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
     if (result == NULL)
         return INVALID_RESULT;
 
-   
+	// Initialize the result with the worst possible match value
+	result->distance = idx->cmp->worst_match_value;
+	result->id = 0;
 
     // Allocate memory for thread data
     data = (ThreadData *)calloc_mem(idx->threads, sizeof(ThreadData));
     if (data == NULL) 
         return SYSTEM_ERROR;
 
-    // Initialize the result with the worst possible match value
-    result->distance = idx->cmp->worst_match_value;
-    result->id = 0;
-
-    // Acquire a read lock to prevent modifications while searching
-    pthread_rwlock_rdlock(&idx->rwlock);
     
     // Create and launch threads for multi-threaded searching
     for (i = 0; i < idx->threads; i++) {
@@ -254,27 +257,25 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
         data[i].result = (MatchResult *) calloc_mem(1, sizeof(MatchResult));
 
 		if (!data[i].vector || !data[i].result) {
-			// Clean up previous allocations
-			for (int j = 0; j <= i; j++) {
-				if (data[j].vector) free_aligned_mem(data[j].vector);
-				if (data[j].result) free_mem(data[j].result);
-			}
+			free_thread_data(data, i);
 			free_mem(data);
-			pthread_rwlock_unlock(&idx->rwlock);
 			return SYSTEM_ERROR;
 		}
 		memcpy(data[i].vector, vector, dims * sizeof(float32_t));
 		data[i].dims = idx->dims_aligned;
         data[i].cmp  = idx->cmp;
-        data[i].head = idx->heads[i];        
     }
 
-	for (i= 0; i < idx->threads; i++) {
-		pthread_create(&data[i].thread, NULL, search_mp_thread, &data[i]);
-	}
+	pthread_rwlock_rdlock(&idx->rwlock);
 
+	for (i= 0; i < idx->threads; i++) {
+		data[i].head = idx->heads[i];
+		if (pthread_create(&data[i].thread, NULL, search_mp_thread, &data[i])!=0) 
+			break;
+	}
+	int join_until = i;
     // Wait for all threads to complete and merge the best results
-    for (i = 0; i < idx->threads; i++) {
+    for (i = 0; i < join_until; i++) {
         pthread_join(data[i].thread, NULL);
 
         // Compare results from all threads and keep the best match
@@ -282,13 +283,9 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
             result->id = data[i].result->id;
             result->distance = data[i].result->distance;
         }
-
-		free_aligned_mem(data[i].vector);
-        // Free memory allocated for individual thread results
-        free_mem(data[i].result);
     }
 
-    // Free allocated memory for thread data
+	free_thread_data(data, idx->threads-1);
     free_mem(data);
 
     // Release the read lock
