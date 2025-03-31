@@ -7,7 +7,7 @@
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
-#define NUM_VECTORS 3000000
+#define NUM_VECTORS 2000000
 
 // Cantidad de vectores a insertar
 
@@ -24,7 +24,7 @@ int main() {
     struct timespec start, end;
 	double elapsed_ms;
     // Parámetros del índice
-    int index_type = FLAT_INDEX_MP;
+    int index_type = FLAT_INDEX;
     int method = COSINE; // Método de prueba
     uint16_t dims = DIMS;
     MatchResult *result;
@@ -56,7 +56,7 @@ int main() {
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	result = calloc(10, sizeof(MatchResult));
 	int ret;
-    if ((ret = search(index, vector, dims, result)) != 0) {
+    if ((ret = search_n(index, vector, dims, result, 10)) != 0) {
         printf("Error en la búsqueda. %d\n", ret);
         return 1;
     }
@@ -76,7 +76,7 @@ int main() {
 	
 
 	clock_gettime(CLOCK_MONOTONIC, &start);
-    if ((ret = search(index, vector, dims, result)) != 0) {
+    if ((ret = search_n(index, vector, dims, result, 10)) != 0) {
         printf("Error en la búsqueda. %d\n", ret);
         return 1;
     }
@@ -96,7 +96,7 @@ int main() {
 
 
 	clock_gettime(CLOCK_MONOTONIC, &start);
-    if ((ret = search(index, vector, dims, result)) != 0) {
+    if ((ret = search_n(index, vector, dims, result, 10)) != 0) {
         printf("Error en la búsqueda. %d\n", ret);
         return 1;
     }

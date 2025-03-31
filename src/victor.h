@@ -53,6 +53,7 @@ typedef enum {
     INVALID_DIMENSIONS,
     INVALID_ID,
     INDEX_EMPTY,
+	THREAD_ERROR,
     SYSTEM_ERROR,
 } ErrorCode;
 
