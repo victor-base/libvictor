@@ -283,9 +283,12 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
     // Allocate memory for thread data
     data = (ThreadData *)calloc_mem(idx->threads, sizeof(ThreadData));
     if (data == NULL) {
+
         if (allocated)
-            free_mem(v);
-        return SYSTEM_ERROR;
+        
+		free_mem(v);
+        
+		return SYSTEM_ERROR;
     }
 
     // Initialize the result with the worst possible match value
