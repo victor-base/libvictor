@@ -19,7 +19,7 @@ endif
 
 # Source files & .obj instructiosm
 
-SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c
+SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c heap.c
 OBJS = $(SRCS:.c=.o)
 
 LDFLAGS = -lm -lpthread
@@ -38,5 +38,9 @@ $(LIBNAME): $(OBJS) # Creará la biblioteca compartida (libvictor.dll en Windows
 # Borro los archivos generados como los .obj y todos los generados en las variables
 clean:
 	rm -f $(OBJS) $(TARGET) $(LIBNAME) 
+
+install:
+	cp libvictor.dylib /usr/local/lib/
+	mkdir -p /usr/local/include/victor && cp victor.h /usr/local/include/victor/
 
 .PHONY: all clean

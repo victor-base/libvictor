@@ -25,6 +25,12 @@
 
 extern void *calloc_mem(size_t __count, size_t __size);
 
+extern void *realloc_mem(void *__ptr, size_t __size);
+
 extern void free_mem(void *__mem);
+
+extern void *aligned_calloc_mem(size_t alignment, size_t size);
+
+extern void free_aligned_mem(void *ptr);
 
 #endif

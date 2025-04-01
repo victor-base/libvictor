@@ -162,11 +162,11 @@ static int flat_delete(void *index, uint64_t id) {
  *         SYSTEM_ERROR if memory allocation fails.
  *         INDEX_EMPTY if no elements exist in the index.
  */
-static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchResult **result, int n) {
+static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchResult *result, int n) {
     IndexFlat *idx = (IndexFlat *)index;
     INodeFlat *current;
     float32_t *v;
-    int allocated = 0;
+	int ret;
 
     if (index == NULL) 
         return INVALID_INDEX;
@@ -177,40 +177,26 @@ static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
     if (result == NULL)
         return INVALID_RESULT;
 
-    *result = (MatchResult *) calloc_mem(n, sizeof(MatchResult));
-    if (*result == NULL)
-        return SYSTEM_ERROR;
 
-    if (dims < idx->dims_aligned) {
-        v = (float32_t *)calloc_mem(1, idx->dims_aligned * sizeof(float32_t));
-        if (v == NULL) {
-            free_mem(*result);
-            return SYSTEM_ERROR;
-        }
-        allocated = 1;
-        memcpy(v, vector, dims * sizeof(float32_t));
-    } else {
-        v = vector;
-    }
+	v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
+	if (v == NULL)
+		return SYSTEM_ERROR;
+
+    memcpy(v, vector, dims * sizeof(float32_t));
+
 
     pthread_rwlock_rdlock(&idx->rwlock);
 
     current = idx->head;
     if (current == NULL) {
-        pthread_rwlock_unlock(&idx->rwlock);
-        if (allocated)
-            free_mem(v);
-        free_mem(*result);
-        return INDEX_EMPTY;
-    }
-
-    flat_linear_search_n(current, v, idx->dims_aligned, *result, n, idx->cmp);
+        ret = INDEX_EMPTY;
+    } else {
+		ret = flat_linear_search_n(current, v, idx->dims_aligned, result, n, idx->cmp);
+	}
 
     pthread_rwlock_unlock(&idx->rwlock);
-    if (allocated)
-        free_mem(v);
-    return SUCCESS;
-
+	free_aligned_mem(v);
+    return ret;
 }
 
 
@@ -248,7 +234,7 @@ static int flat_search(void *index, float32_t *vector, uint16_t dims, MatchResul
     IndexFlat *idx = (IndexFlat *)index;
     INodeFlat *current;
     float32_t *v;
-    int allocated = 0;
+    int ret;
 
     if (index == NULL) 
         return INVALID_INDEX;
@@ -259,32 +245,26 @@ static int flat_search(void *index, float32_t *vector, uint16_t dims, MatchResul
     if (result == NULL)
         return INVALID_RESULT;
 
-    if (dims < idx->dims_aligned) {
-        v = (float32_t *)calloc_mem(1, idx->dims_aligned * sizeof(float32_t));
-        if (v == NULL)
-            return SYSTEM_ERROR;
-        allocated = 1;
-        memcpy(v, vector, dims * sizeof(float32_t));
-    } else {
-        v = vector;
-    }
+	v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
+	if (v == NULL)
+		return SYSTEM_ERROR;
+
+	memcpy(v, vector, dims * sizeof(float32_t));
+
 
     pthread_rwlock_rdlock(&idx->rwlock);
     
     current = idx->head;
     if (current == NULL) {
-        pthread_rwlock_unlock(&idx->rwlock);
-        if (allocated)
-            free_mem(v);
-        return INDEX_EMPTY;
-    }
-
-    flat_linear_search(current, v, idx->dims_aligned, result, idx->cmp);
-
+        ret = INDEX_EMPTY;
+    } else {
+		flat_linear_search(current, v, idx->dims_aligned, result, idx->cmp);
+		ret = SUCCESS;
+	}
     pthread_rwlock_unlock(&idx->rwlock);
-    if (allocated)
-        free_mem(v);
-    return SUCCESS;
+    
+    free_aligned_mem(v);
+    return ret;
 }
 
 /*

@@ -22,25 +22,26 @@
  * This file implements the memory allocation and deallocation functions 
  * for the `Vector` structure used in the vector cache database.
  */
+#include <string.h>
+#include "config.h"
+#include "vector.h"
+#include "mem.h"
 
- #include "config.h"
- #include "vector.h"
- #include "mem.h"
- #include <string.h>
  
- /**
-  * Allocates and initializes a new `Vector` structure.
-  *
-  * @param id    Unique identifier for the vector.
-  * @param src   Pointer to the source data (can be NULL).
-  * @param dims  Number of dimensions (size of the vector).
-  * @return Pointer to the newly allocated `Vector` structure, or NULL on failure.
-  */
+/**
+ * Allocates and initializes a new `Vector` structure.
+ *
+ * @param id    Unique identifier for the vector.
+ * @param src   Pointer to the source data (can be NULL).
+ * @param dims  Number of dimensions (size of the vector).
+ * @return Pointer to the newly allocated `Vector` structure, or NULL on failure.
+ */
 Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims) {
     Vector *vector;
     uint16_t dims_aligned = ALIGN_DIMS(dims);
     
-    vector = (Vector *) calloc_mem(1, sizeof(Vector) + (dims_aligned * sizeof(float32_t)));
+
+	vector = (Vector *) aligned_calloc_mem(16,sizeof(Vector) + (dims_aligned * sizeof(float32_t)));
     if (vector && src) {
         memcpy(vector->vector, src, dims * sizeof(float32_t));
         vector->id = id;
@@ -56,7 +57,7 @@ Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims) {
  */
 void free_vector(Vector **vector) {
     if (vector && *vector) {
-        free_mem(*vector);
-        *vector = NULL;
+		free_aligned_mem(*vector);
+		*vector = NULL;
     }
 }
