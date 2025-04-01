@@ -1,6 +1,6 @@
 #Makefile exclusivo de Windows. 
-- Para ejecutar el makefile: make -f .\Makefile.win, para limpiar: make -f .\Makefile.win  clean
-- Para generar el .exe: gcc -o runtest.exe test.o index.o index_flat.o math.o mem.o method.o vector.o iflat_utils.o index_flat_mp.o heap.o -L. -lvictor
+# - Para ejecutar el makefile: make -f .\Makefile.win, para limpiar: make -f .\Makefile.win  clean
+# - Para generar el .exe: gcc -o runtest.exe test.o index.o index_flat.o math.o mem.o method.o vector.o iflat_utils.o index_flat_mp.o heap.o -L. -lvictor
 
 # Nombre de la librería (se generará .dll)
 LIB_NAME = libvictor.dll
