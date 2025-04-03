@@ -24,7 +24,7 @@ int main() {
     struct timespec start, end;
 	double elapsed_ms;
     // Parámetros del índice
-    int index_type = FLAT_INDEX;
+    int index_type = FLAT_INDEX_MP;
     int method = COSINE; // Método de prueba
     uint16_t dims = DIMS;
     MatchResult *result;

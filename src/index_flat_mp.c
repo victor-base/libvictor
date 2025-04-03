@@ -57,12 +57,12 @@
 typedef struct {
     CmpMethod *cmp;          // Comparison method (L2 norm, cosine similarity, etc.)
     INodeFlat **heads;       // Head of the doubly linked list
-    long threads;            // Number of threads for parallel search
-    int  rr;                 // Round-robin counter for parallel insert
-
     uint64_t elements;       // Number of elements stored in the index
     uint16_t dims;           // Number of dimensions for each vector
     uint16_t dims_aligned;   // Aligned dimensions for efficient memory access
+
+	long threads;            // Number of threads for parallel search
+    int  rr;                 // Round-robin counter for parallel insert
 
     pthread_rwlock_t rwlock; // Read-write lock for thread safety
 } IndexFlatMp;

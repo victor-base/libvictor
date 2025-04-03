@@ -31,31 +31,32 @@
  
  #define ALIGN_DIMS(d) (((d) + 3) & ~3)
 
- /**
-  * Structure representing a vector with an identifier and a dynamically
-  * sized floating-point array.
-  */
-typedef struct {
-	uint64_t id;        // Unique identifier for the vector
-	float32_t vector[]; // Flexible array member for storing float values
+/**
+ * Structure representing a vector with an identifier and a dynamically
+ * sized floating-point array.
+ */
+typedef struct __attribute__((aligned(16))) {
+	uint64_t id;
+	uint64_t __res;     
+	float32_t vector[];
 } Vector;
  
- /**
-  * Allocates and initializes a new `Vector` structure.
-  *
-  * @param id    Unique identifier for the vector.
-  * @param src   Pointer to the source data (can be NULL).
-  * @param dims  Number of dimensions (size of the vector).
-  * @return Pointer to the newly allocated `Vector` structure, or NULL on failure.
-  */
- extern Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims);
+/**
+ * Allocates and initializes a new `Vector` structure.
+ *
+ * @param id    Unique identifier for the vector.
+ * @param src   Pointer to the source data (can be NULL).
+ * @param dims  Number of dimensions (size of the vector).
+ * @return Pointer to the newly allocated `Vector` structure, or NULL on failure.
+ */
+extern Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims);
+
+/**
+ * Frees the memory allocated for a `Vector` structure.
+ *
+ * @param vector Pointer to the `Vector` structure to be freed.
+ */
+extern void free_vector(Vector **vector);
  
- /**
-  * Frees the memory allocated for a `Vector` structure.
-  *
-  * @param vector Pointer to the `Vector` structure to be freed.
-  */
- extern void free_vector(Vector **vector);
- 
- #endif // __VECTOR_H
+#endif // __VECTOR_H
  
