@@ -23,6 +23,8 @@
 #include "victor.h"
 #include "mem.h"
 
+#define HEAP_NODE_INT(u)   ((u).i)
+#define HEAP_NODE_PTR(u)   ((u).p)
 
 #define LCHD(i) (2 * (i) + 1)
 #define RCHD(i) (2 * (i) + 2)
@@ -35,7 +37,12 @@
 #define HEAP_MAX 2
 
 typedef struct {
-    void *node;
+
+	union {
+		int   i;
+		void *p;
+	} value;
+
     float32_t distance;
 } HeapNode;
 

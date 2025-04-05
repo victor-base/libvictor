@@ -9,7 +9,7 @@ LIB_NAME = libvictor.dll
 EXEC = runtest.exe
 
 # Archivos fuente
-SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c heap.c
+SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c heap.c time.c map.c
 
 # Archivos objeto correspondientes
 OBJS = $(SRCS:.c=.o)

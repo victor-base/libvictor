@@ -37,7 +37,6 @@
 */
 
 #include "config.h"
-#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include "iflat_utils.h"
@@ -59,8 +58,6 @@ typedef struct {
     uint64_t elements;       // Number of elements stored in the index
     uint16_t dims;           // Number of dimensions for each vector
     uint16_t dims_aligned;   // Aligned dimensions for efficient memory access
-
-    pthread_rwlock_t rwlock; // Read-write lock for thread safety
 } IndexFlat;
 
 
@@ -91,7 +88,6 @@ static IndexFlat *flat_init(int method, uint16_t dims) {
     index->elements = 0;
     index->dims = dims;
     index->dims_aligned = ALIGN_DIMS(dims);
-    pthread_rwlock_init(&index->rwlock, NULL);
     return index;
 }
 
@@ -116,18 +112,16 @@ static IndexFlat *flat_init(int method, uint16_t dims) {
  *         INVALID_INDEX if the index pointer is NULL.
  *         INVALID_ID if the vector ID was not found in the index.
  */
-static int flat_delete(void *index, uint64_t id) {
-    IndexFlat *ptr = (IndexFlat *)index;
-    int ret;
+static int flat_delete(void *index, void *ref) {
+    IndexFlat *ptr  = (IndexFlat *)index;
+    INodeFlat *node = (INodeFlat *)ref;
+	int ret;
     if (index == NULL) 
         return INVALID_INDEX;
 
-    pthread_rwlock_wrlock(&ptr->rwlock);
-    if ((ret = delete_node(&(ptr->head),id)) == SUCCESS) {
+    if ((ret = delete_node(&(ptr->head),node)) == SUCCESS) {
         ptr->elements--;
     }
-    // Verificar, quiza no estaba
-    pthread_rwlock_unlock(&ptr->rwlock);
     return ret;
 }
 
@@ -184,9 +178,6 @@ static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
 
     memcpy(v, vector, dims * sizeof(float32_t));
 
-
-    pthread_rwlock_rdlock(&idx->rwlock);
-
     current = idx->head;
     if (current == NULL) {
         ret = INDEX_EMPTY;
@@ -194,7 +185,6 @@ static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
 		ret = flat_linear_search_n(current, v, idx->dims_aligned, result, n, idx->cmp);
 	}
 
-    pthread_rwlock_unlock(&idx->rwlock);
 	free_aligned_mem(v);
     return ret;
 }
@@ -251,9 +241,6 @@ static int flat_search(void *index, float32_t *vector, uint16_t dims, MatchResul
 
 	memcpy(v, vector, dims * sizeof(float32_t));
 
-
-    pthread_rwlock_rdlock(&idx->rwlock);
-    
     current = idx->head;
     if (current == NULL) {
         ret = INDEX_EMPTY;
@@ -261,8 +248,7 @@ static int flat_search(void *index, float32_t *vector, uint16_t dims, MatchResul
 		flat_linear_search(current, v, idx->dims_aligned, result, idx->cmp);
 		ret = SUCCESS;
 	}
-    pthread_rwlock_unlock(&idx->rwlock);
-    
+
     free_aligned_mem(v);
     return ret;
 }
@@ -295,7 +281,7 @@ static int flat_search(void *index, float32_t *vector, uint16_t dims, MatchResul
  *         INVALID_DIMENSIONS if the vector dimensions do not match the index.
  *         SYSTEM_ERROR if memory allocation fails.
  */
-static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims) {
+static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims, void **ref) {
     IndexFlat *ptr = (IndexFlat *)index;
     INodeFlat *node;
     Vector    *nvec;
@@ -307,7 +293,7 @@ static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dim
     if (dims != ptr->dims) 
         return INVALID_DIMENSIONS;
 
-    node = (INodeFlat *) malloc (sizeof(INodeFlat));
+    node = (INodeFlat *) calloc_mem(1, sizeof(INodeFlat));
     
     if (node == NULL) 
         return SYSTEM_ERROR;
@@ -317,16 +303,14 @@ static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dim
         free_mem(node);
         return SYSTEM_ERROR;
     }
-    pthread_rwlock_wrlock(&ptr->rwlock);
-
-    node->next = NULL;
-    node->prev = NULL;
 
     node->vector = nvec;
     insert_node(&(ptr->head), node);
     ptr->elements++;
 
-    pthread_rwlock_unlock(&ptr->rwlock);
+	if (ref != NULL)
+		*ref = node;
+
     return SUCCESS;
 }
 
@@ -345,8 +329,6 @@ static int flat_release(void **index) {
     IndexFlat *idx = *index;
     INodeFlat *ptr;
 
-    pthread_rwlock_wrlock(&idx->rwlock);
-
     ptr = idx->head;
     while (ptr) {
         idx->head = ptr->next;
@@ -356,8 +338,6 @@ static int flat_release(void **index) {
         ptr = idx->head;
     }
 
-    pthread_rwlock_unlock(&idx->rwlock);
-    pthread_rwlock_destroy(&idx->rwlock); 
     free_mem(idx);  
     *index = NULL;
     return SUCCESS;

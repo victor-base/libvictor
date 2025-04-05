@@ -64,7 +64,6 @@ typedef struct {
 	long threads;            // Number of threads for parallel search
     int  rr;                 // Round-robin counter for parallel insert
 
-    pthread_rwlock_t rwlock; // Read-write lock for thread safety
 } IndexFlatMp;
 
 typedef struct {
@@ -129,7 +128,6 @@ static IndexFlatMp *flat_mp_init(int method, uint16_t dims) {
     index->elements = 0;
     index->dims = dims;
     index->dims_aligned = ALIGN_DIMS(dims);
-    pthread_rwlock_init(&index->rwlock, NULL);
     return index;
 }
 
@@ -154,21 +152,21 @@ static IndexFlatMp *flat_mp_init(int method, uint16_t dims) {
  *         INVALID_INDEX if the index pointer is NULL.
  *         INVALID_ID if the vector ID was not found in the index.
  */
-static int flat_delete_mp(void *index, uint64_t id) {
-    IndexFlatMp *ptr = (IndexFlatMp *)index;
+static int flat_delete_mp(void *index, void *ref) {
+    IndexFlatMp *ptr  = (IndexFlatMp *) index;
+	INodeFlat   *node = (INodeFlat *) ref;
     int ret;
     int i;
     if (index == NULL) 
         return INVALID_INDEX;
 
-    pthread_rwlock_wrlock(&ptr->rwlock);
     for (i = 0; i < ptr->threads; i++) {
-        if ((ret = delete_node(&(ptr->heads[i]),id)) == SUCCESS) {
+        if ((ret = delete_node(&(ptr->heads[i]),node)) == SUCCESS) {
             ptr->elements--;
             break;
         }
     }
-    pthread_rwlock_unlock(&ptr->rwlock);
+
     return ret;
 }
 
@@ -309,13 +307,11 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
 	result->distance = idx->cmp->worst_match_value;
 	result->id = 0;
 
-	pthread_rwlock_rdlock(&idx->rwlock);
 
 	ret = make_thread_data(&data, idx, vector, dims, 1);
-	if (ret != SUCCESS) {
-		pthread_rwlock_unlock(&idx->rwlock);
+	if (ret != SUCCESS) 
 		return ret;
-	}
+
 
 	ret = SUCCESS;
 	for (i= 0; i < idx->threads; i++) {
@@ -339,9 +335,6 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
     }
 
 	free_thread_data(data, idx->threads);
-    // Release the read lock
-    pthread_rwlock_unlock(&idx->rwlock);
-
     return ret;
 }
 
@@ -404,17 +397,13 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
 		result[i].id = 0;
 	}
 
-	pthread_rwlock_rdlock(&idx->rwlock);
-
 	ret = make_thread_data(&data, idx, vector, dims, n);
-	if (ret != SUCCESS) {
-		pthread_rwlock_unlock(&idx->rwlock);
+	if (ret != SUCCESS) 
 		return ret;
-	}
+
 	
 	if (init_heap(&heap, HEAP_MAX, idx->threads * n, idx->cmp->is_better_match) != HEAP_SUCCESS) {
 		free_thread_data(data, idx->threads);
-		pthread_rwlock_unlock(&idx->rwlock);
 		return SYSTEM_ERROR; // o un error específico como HEAP_ERROR
 	}
 
@@ -436,7 +425,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
         if (ret != THREAD_ERROR) {
 			for (k = 0; k < n; k ++) {
 				node.distance = data[i].result[k].distance;
-				node.node     = &(data[i].result[k].id);
+				HEAP_NODE_INT(node.value) = data[i].result[k].id;
 				heap_insert(&heap, &node);
 			}
         }
@@ -446,15 +435,11 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
 		for ( i = 0; i < n; i++ ) {
 			heap_pop(&heap, &node);
 			result[i].distance = node.distance;
-			result[i].id = *(int *)node.node;
+			result[i].id = HEAP_NODE_INT(node.value);
 		}
 	}
 	heap_destroy(&heap);
 	free_thread_data(data, idx->threads);
-
-    // Release the read lock
-    pthread_rwlock_unlock(&idx->rwlock);
-
     return ret;
 }
 
@@ -488,7 +473,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
  *         INVALID_DIMENSIONS if the vector dimensions do not match the index.
  *         SYSTEM_ERROR if memory allocation fails.
  */
-static int flat_insert_mp(void *index, uint64_t id, float32_t *vector, uint16_t dims) {
+static int flat_insert_mp(void *index, uint64_t id, float32_t *vector, uint16_t dims, void **ref) {
     IndexFlatMp *ptr = (IndexFlatMp *)index;
     INodeFlat *node;
     Vector    *nvec;
@@ -510,16 +495,14 @@ static int flat_insert_mp(void *index, uint64_t id, float32_t *vector, uint16_t 
         free_mem(node);
         return SYSTEM_ERROR;
     }
-    pthread_rwlock_wrlock(&ptr->rwlock);
-
-    node->next = NULL;
-    node->prev = NULL;
 
     node->vector = nvec;
     insert_node(&(ptr->heads[(ptr->rr++)%ptr->threads]), node);
     ptr->elements++;
 
-    pthread_rwlock_unlock(&ptr->rwlock);
+	if (ref)
+		*ref = node;
+
     return SUCCESS;
 }
 
@@ -539,8 +522,6 @@ static int flat_release_mp(void **index) {
     IndexFlatMp *idx = *index;
     INodeFlat *ptr;
 
-    pthread_rwlock_wrlock(&idx->rwlock);
-
     for (i = 0; i < idx->threads; i++) {
         ptr = idx->heads[i];
         while (ptr) {
@@ -551,9 +532,6 @@ static int flat_release_mp(void **index) {
             ptr = idx->heads[i];
         }
     }
-
-    pthread_rwlock_unlock(&idx->rwlock);
-    pthread_rwlock_destroy(&idx->rwlock);
     free_mem(idx->heads);
     free_mem(idx);  
     *index = NULL;
@@ -564,7 +542,6 @@ static int flat_release_mp(void **index) {
 /*-------------------------------------------------------------------------------------*
  *                                PUBLIC FUNCTIONS                                     *
  *-------------------------------------------------------------------------------------*/
-
 
 /*
  * flat_index - Initializes a generic index structure with a flat index.

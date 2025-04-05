@@ -50,28 +50,26 @@ INodeFlat *search_node(INodeFlat **head, uint64_t id) {
  *
  * @return SUCCESS if deletion was successful, INVALID_ID if not found.
  */
-int delete_node(INodeFlat **head, uint64_t id) {
-    if (!head || !(*head)) return INVALID_ID;
-
-    INodeFlat *current = *head;
-    while (current) {
-        if (current->vector->id == id) {
-            if (current->prev) {
-                current->prev->next = current->next;  
-            } else {
-                *head = current->next; 
-            }
-            if (current->next) {
-                current->next->prev = current->prev;
-            }
-            free_mem(current->vector);
-            free_mem(current);          
-            return SUCCESS;
-        }
-        current = current->next;
-    }
-    return INVALID_ID;
+int delete_node(INodeFlat **head, INodeFlat *node) {
+	PANIC_IF(head == NULL || *head == NULL, "null head in delete node");
+	INodeFlat *curr = *head;
+	while (curr) {
+		if (curr == node) {
+			if (curr->prev) 
+				curr->prev->next = curr->next;
+			else
+				*head = curr->next;
+			if (curr->next)
+				curr->next->prev = curr->prev;
+			free_mem(curr->vector);
+			free_mem(curr);
+			return SUCCESS;
+		}
+		curr = curr->next;
+	}
+	return INVALID_REF;
 }
+
 
 /*
  * flat_linear_search - Performs a linear search for the best match in a flat index.
@@ -152,12 +150,12 @@ int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned
 		if (heap_full(&heap)) {
 			PANIC_IF(heap_peek(&heap, &node) == HEAP_ERROR_EMPTY, "peek on empty heap");
 			if (cmp->is_better_match(distance, node.distance)) {
-				node.node = current;
+				HEAP_NODE_PTR(node.value) = current;
 				node.distance = distance;
 				PANIC_IF(heap_replace(&heap, &node) == HEAP_ERROR_EMPTY, "replace on empty heap");
 			}
 		} else {
-			node.node = current;
+			HEAP_NODE_PTR(node.value) = current;
 			node.distance = distance;
 			PANIC_IF(heap_insert(&heap, &node) == HEAP_ERROR_FULL, "insert on full heap");
 		}
@@ -168,7 +166,7 @@ int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned
 	for (k = heap_size(&heap); k > 0; k = heap_size(&heap)) {
 		heap_pop(&heap, &node);
 		result[k-1].distance = node.distance;
-		result[k-1].id = ((INodeFlat *)node.node)->vector->id;
+		result[k-1].id = ((INodeFlat *)HEAP_NODE_PTR(node.value))->vector->id;
 	}
 
 	heap_destroy(&heap);

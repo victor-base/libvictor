@@ -43,7 +43,7 @@ extern INodeFlat *search_node(INodeFlat **head, uint64_t id);
  *
  * @return SUCCESS if deletion was successful, INVALID_ID if not found.
  */
-extern int delete_node(INodeFlat **head, uint64_t id);
+extern int delete_node(INodeFlat **head, INodeFlat *node);
 
 
 /*

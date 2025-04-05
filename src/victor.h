@@ -29,6 +29,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 typedef float float32_t;
 
@@ -52,6 +53,9 @@ typedef enum {
     INVALID_RESULT,
     INVALID_DIMENSIONS,
     INVALID_ID,
+	INVALID_REF,
+	DUPLICATED_ENTRY,
+	NOT_FOUND_ID,
     INDEX_EMPTY,
 	THREAD_ERROR,
     SYSTEM_ERROR,
@@ -62,14 +66,60 @@ typedef enum {
 #define NSW_INDEX     0x02 // Not implemented yet
 #define HNSW_INDEX    0x03 // Not implemented yet
 
+typedef struct {
+    uint64_t count;
+    double   total;
+    double   min;
+    double   max;
+} TimeStat;
+
+typedef struct {
+    TimeStat insert;
+    TimeStat delete;
+    TimeStat search;
+    TimeStat search_n;
+} IndexStats;
+
+/**
+ * Structure representing a single node in the hash map.
+ * Each node stores a 64-bit unique ID, a reference to a value (ref),
+ * and a pointer to the next node in the same bucket.
+ */
+typedef struct map_node {
+	uint64_t id;
+	void   *ref;
+	struct map_node *next;
+} MapNode;
+
+/**
+ * Structure representing the hash map.
+ * Includes configuration for load factor threshold, total map size,
+ * number of elements currently inserted, and the map buckets.
+ */
+typedef struct {
+	uint16_t lfactor;             // Current load factor
+	uint16_t lfactor_thrhold;     // Load factor threshold for triggering rehash
+	uint32_t mapsize;             // Total number of buckets
+
+	uint64_t elements;            // Total number of elements stored
+	MapNode  **map;               // Array of buckets
+} Map;
+
+
 /**
  * Structure representing an abstract index for vector search.
  * It supports multiple indexing strategies through function pointers.
  */
 typedef struct {
-    char *name;     // Name of the indexing method (e.g., "Flat", "HNSW")
+    char *name;        // Name of the indexing method (e.g., "Flat", "HNSW")
     void *data;        // Pointer to the specific index data structure
     void *context;     // Additional context for advanced indexing needs
+
+	IndexStats stats;
+
+	Map map;
+
+	pthread_rwlock_t rwlock; // Read-write lock for thread safety
 
     /**
      * Searches for the `n` closest matches to the given vector.
@@ -100,7 +150,7 @@ typedef struct {
      * @param dims The number of dimensions.
      * @return 0 if successful, or -1 on error.
      */
-    int (*insert)(void *, uint64_t, float32_t *, uint16_t);
+    int (*insert)(void *, uint64_t, float32_t *, uint16_t, void **ref);
 
     /**
      * Deletes a vector from the index using its ID.
@@ -108,7 +158,7 @@ typedef struct {
      * @param id The unique identifier of the vector to delete.
      * @return 0 if successful, or -1 on error.
      */
-    int (*delete)(void *, uint64_t);
+    int (*delete)(void *, void *);
 
     int (*_release)(void **);
 
@@ -125,6 +175,8 @@ extern int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult 
 extern int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result);
 extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
 extern int delete(Index *index, uint64_t id);
+
+extern int stats(Index *Index, IndexStats *stats);
 
 extern Index *alloc_index(int type, int method, uint16_t dims, void *icontext);
 extern int destroy_index(Index **index);
