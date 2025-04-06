@@ -76,8 +76,8 @@ float32_t euclidean_distance(float32_t *v1, float32_t *v2, int dims)
     __m128 acc = _mm_setzero_ps();
     for (i = 0; i < dims; i += 4)
     {
-        __m128 a = _mm_loadu_ps(v1 + i);
-        __m128 b = _mm_loadu_ps(v2 + i);
+        __m128 a = _mm_load_ps(v1 + i);
+        __m128 b = _mm_load_ps(v2 + i);
 
         // substraction
         __m128 diff = _mm_sub_ps(a, b);
@@ -164,8 +164,8 @@ float32_t cosine_similarity(float32_t *v1, float32_t *v2, int dims)
 
     for (i = 0; i < dims; i += 4)
     {
-        __m128 a = _mm_loadu_ps(v1 + i);
-        __m128 b = _mm_loadu_ps(v2 + i);
+        __m128 a = _mm_load_ps(v1 + i);
+        __m128 b = _mm_load_ps(v2 + i);
 
         acc_dot = _mm_add_ps(acc_dot, _mm_mul_ps(a, b)); // Dot product
 
