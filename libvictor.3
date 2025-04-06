@@ -4,65 +4,162 @@ libvictor \- In-memory vector index library with C ABI
 
 .SH SYNOPSIS
 .B #include <victor.h>
+.br
 
-.BI "int search(Index *" index ", float32_t *" vector ", uint16_t " dims ", MatchResult *" result );
+.BI "int search(Index *" index ", float32_t *" vector ", uint16_t " dims ", MatchResult *" result ");"
 .br
-.BI "int search_n(Index *" index ", float32_t *" vector ", uint16_t " dims ", MatchResult **" results ", int " n );
+.BI "int search_n(Index *" index ", float32_t *" vector ", uint16_t " dims ", MatchResult *" results ", int " n ");"
 .br
-.BI "int insert(Index *" index ", uint64_t " id ", float32_t *" vector ", uint16_t " dims );
+.BI "int insert(Index *" index ", uint64_t " id ", float32_t *" vector ", uint16_t " dims ");"
 .br
-.BI "int delete(Index *" index ", uint64_t " id );
+.BI "int delete(Index *" index ", uint64_t " id ");"
 .br
-.BI "Index* alloc_index(int " type ", int " method ", uint16_t " dims ", void *" context );
+.BI "int stats(Index *" index ", IndexStats *" stats ");"
 .br
-.BI "int destroy_index(Index **" index );
+.BI "Index* alloc_index(int " type ", int " method ", uint16_t " dims ", void *" context ");"
+.br
+.BI "int destroy_index(Index **" index ");"
 
 .SH DESCRIPTION
-libvictor is a high-performance C library for managing in-memory vector indexes, such as Flat and HNSW. 
-It exposes a minimal C ABI with consistent function signatures that support insertion, deletion, allocation and vector search.
+.B libvictor
+is a high-performance C library for managing in-memory vector indexes through a minimal and consistent API.
+
+It supports multiple indexing strategies such as flat vector search (FLAT), flat multithreaded search (FLAT_INDEX_MP), and has planned support for graph-based indexes like NSW and HNSW.
+
+The library allows for fast similarity search, insertion, and deletion of vectors, with full support for customizable distance metrics (e.g., L2 norm or cosine similarity).  
+All operations are thread-safe via internal locking.
 
 .SH TYPES
 
 .TP
 .B MatchResult
-Structure returned by search queries:
+Structure used to store the result of a search query:
 .nf
     typedef struct {
-        int id;
-        float distance;
+        int id;             // ID of the matching vector
+        float distance;     // Distance or similarity score
     } MatchResult;
 .fi
 
 .TP
 .B ErrorCode
-Enum representing common error codes:
+Enumeration of possible return values for all public functions:
 .nf
-    SUCCESS, INVALID_INIT, INVALID_INDEX, INVALID_VECTOR,
-    INVALID_RESULT, INVALID_DIMENSIONS, INVALID_ID,
-    INDEX_EMPTY, SYSTEM_ERROR
+    typedef enum {
+        SUCCESS,
+        INVALID_INIT,
+        INVALID_INDEX,
+        INVALID_VECTOR,
+        INVALID_RESULT,
+        INVALID_DIMENSIONS,
+        INVALID_ID,
+        INVALID_REF,
+        DUPLICATED_ENTRY,
+        NOT_FOUND_ID,
+        INDEX_EMPTY,
+        THREAD_ERROR,
+        SYSTEM_ERROR,
+    } ErrorCode;
 .fi
 
 .TP
 .B Comparison Methods
+Available distance metrics:
 .nf
-    #define L2NORM 0x00  // Euclidean Distance
-    #define COSINE 0x01  // Cosine Similarity
+    #define L2NORM 0x00   // Euclidean distance
+    #define COSINE 0x01   // Cosine similarity
 .fi
 
 .TP
 .B Index Types
+Available index implementations:
 .nf
-    #define FLAT_INDEX    0x00
-    #define FLAT_INDEX_MP 0x01
-    #define NSW_INDEX     0x02
-    #define HNSW_INDEX    0x03
+    #define FLAT_INDEX     0x00  // Flat (sequential)
+    #define FLAT_INDEX_MP  0x01  // Flat (multi-threaded)
+    #define NSW_INDEX      0x02  // Navigable Small World (planned)
+    #define HNSW_INDEX     0x03  // Hierarchical NSW (planned)
 .fi
 
+.TP
+.B IndexStats
+Structure storing timing statistics for each index operation:
+.nf
+    typedef struct {
+        TimeStat insert;
+        TimeStat delete;
+        TimeStat search;
+        TimeStat search_n;
+    } IndexStats;
+.fi
+
+Each \fBTimeStat\fR includes:
+.nf
+    uint64_t count;   // Number of calls
+    double   total;   // Total time in seconds
+    double   min;     // Shortest duration
+    double   max;     // Longest duration
+.fi
+
+.SH FUNCTIONS
+
+.TP
+.BI "int search(Index *" index ", float32_t *" vector ", uint16_t " dims ", MatchResult *" result );
+Searches the index for the closest match to the given vector.
+Returns \fBSUCCESS\fR if a match is found and stored in \fIresult\fR.
+
+.TP
+.BI "int search_n(Index *" index ", float32_t *" vector ", uint16_t " dims ", MatchResult *" results ", int " n );
+Finds the \fIn\fR closest matches to the given vector and stores them in the \fIresults\fR array.
+Returns \fBSUCCESS\fR if successful.
+
+.TP
+.BI "int insert(Index *" index ", uint64_t " id ", float32_t *" vector ", uint16_t " dims );
+Inserts a new vector with a unique ID into the index.
+Returns \fBSUCCESS\fR if the insertion completes without conflict.
+
+.TP
+.BI "int delete(Index *" index ", uint64_t " id );
+Removes the vector associated with the given ID from the index.
+Returns \fBSUCCESS\fR if the vector existed and was removed.
+
+.TP
+.BI "int stats(Index *" index ", IndexStats *" stats );
+Retrieves the operation timing statistics and stores them in \fIstats\fR.
+Returns \fBSUCCESS\fR.
+
+.TP
+.BI "Index* alloc_index(int " type ", int " method ", uint16_t " dims ", void *" context );
+Creates and initializes a new vector index with the given type and distance method.
+Returns a pointer to the new \fBIndex\fR structure or \fBNULL\fR on failure.
+
+.TP
+.BI "int destroy_index(Index **" index );
+Releases all memory and internal resources associated with the given index.
+Returns \fBSUCCESS\fR if the index was properly destroyed.
+
 .SH RETURN VALUES
-Most functions return 0 on success or a negative integer from the ErrorCode enum on failure.
+All functions return a value from the
+.B ErrorCode
+enumeration.
+
+A return value of
+.B SUCCESS
+(0) indicates that the operation completed successfully.
+
+Any other value represents a specific failure condition, such as
+.B DUPLICATED_ENTRY,
+.B INVALID_DIMENSIONS,
+or
+.B SYSTEM_ERROR.
+Refer to the
+.B ErrorCode
+enum for detailed meanings.
+
+.SH THREAD SAFETY
+All index operations are thread-safe. Internal read-write locks ensure safe concurrent access to the index data.
 
 .SH SEE ALSO
-victord(1)
+.BR victord (1)
 
 .SH AUTHOR
 Emiliano A. Billi <emiliano.billi@gmail.com>

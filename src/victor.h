@@ -34,8 +34,8 @@
 typedef float float32_t;
 
 typedef struct {
-    int id;
-    float32_t distance;
+    int id;                  // ID of the matched vector
+    float32_t distance;      // Distance or similarity score
 } MatchResult;
 
 /**
@@ -44,7 +44,9 @@ typedef struct {
 #define L2NORM 0x00  // Euclidean Distance
 #define COSINE 0x01  // Cosine Similarity
 
-
+/**
+ * Enumeration of error codes returned by index operations.
+ */
 typedef enum {
     SUCCESS,
     INVALID_INIT,
@@ -53,42 +55,51 @@ typedef enum {
     INVALID_RESULT,
     INVALID_DIMENSIONS,
     INVALID_ID,
-	INVALID_REF,
-	DUPLICATED_ENTRY,
-	NOT_FOUND_ID,
+    INVALID_REF,
+    DUPLICATED_ENTRY,
+    NOT_FOUND_ID,
     INDEX_EMPTY,
-	THREAD_ERROR,
+    THREAD_ERROR,
     SYSTEM_ERROR,
 } ErrorCode;
 
-#define FLAT_INDEX    0x00
-#define FLAT_INDEX_MP 0x01
-#define NSW_INDEX     0x02 // Not implemented yet
-#define HNSW_INDEX    0x03 // Not implemented yet
+/**
+ * Constants for index types.
+ */
+#define FLAT_INDEX    0x00  // Sequential flat index (single-threaded)
+#define FLAT_INDEX_MP 0x01  // Flat index with multi-threaded support
+#define NSW_INDEX     0x02  // Navigable Small World graph (planned)
+#define HNSW_INDEX    0x03  // Hierarchical NSW (planned)
 
+/**
+ * Statistics structure for timing measurements.
+ */
 typedef struct {
-    uint64_t count;
-    double   total;
-    double   min;
-    double   max;
+    uint64_t count;      // Number of operations
+    double   total;      // Total time in seconds
+    double   min;        // Minimum operation time
+    double   max;        // Maximum operation time
 } TimeStat;
 
+/**
+ * Aggregate statistics for the index.
+ */
 typedef struct {
-    TimeStat insert;
-    TimeStat delete;
-    TimeStat search;
-    TimeStat search_n;
+    TimeStat insert;     // Insert operations timing
+    TimeStat delete;     // Delete operations timing
+    TimeStat search;     // Single search timing
+    TimeStat search_n;   // Multi-search timing
 } IndexStats;
 
 /**
  * Structure representing a single node in the hash map.
- * Each node stores a 64-bit unique ID, a reference to a value (ref),
+ * Each node stores a 64-bit unique ID, a reference to a index struct (ref),
  * and a pointer to the next node in the same bucket.
  */
 typedef struct map_node {
-	uint64_t id;
-	void   *ref;
-	struct map_node *next;
+    uint64_t id;
+    void   *ref;
+    struct map_node *next;
 } MapNode;
 
 /**
@@ -97,12 +108,12 @@ typedef struct map_node {
  * number of elements currently inserted, and the map buckets.
  */
 typedef struct {
-	uint16_t lfactor;             // Current load factor
-	uint16_t lfactor_thrhold;     // Load factor threshold for triggering rehash
-	uint32_t mapsize;             // Total number of buckets
+    uint16_t lfactor;             // Current load factor
+    uint16_t lfactor_thrhold;     // Load factor threshold for triggering rehash
+    uint32_t mapsize;             // Total number of buckets
 
-	uint64_t elements;            // Total number of elements stored
-	MapNode  **map;               // Array of buckets
+    uint64_t elements;            // Total number of elements stored
+    MapNode  **map;               // Array of buckets
 } Map;
 
 
@@ -115,11 +126,11 @@ typedef struct {
     void *data;        // Pointer to the specific index data structure
     void *context;     // Additional context for advanced indexing needs
 
-	IndexStats stats;
+    IndexStats stats;  // Accumulated timing statistics for operations
 
-	Map map;
+    Map map;           // ID-to-node hash map used by all index types
 
-	pthread_rwlock_t rwlock; // Read-write lock for thread safety
+    pthread_rwlock_t rwlock; // Read-write lock for thread-safe access
 
     /**
      * Searches for the `n` closest matches to the given vector.
@@ -148,6 +159,7 @@ typedef struct {
      * @param id The unique identifier for the vector.
      * @param vector The input vector.
      * @param dims The number of dimensions.
+     * @param ref Optional output pointer to store the internal reference.
      * @return 0 if successful, or -1 on error.
      */
     int (*insert)(void *, uint64_t, float32_t *, uint16_t, void **ref);
@@ -155,31 +167,72 @@ typedef struct {
     /**
      * Deletes a vector from the index using its ID.
      * @param data The specific index data structure.
-     * @param id The unique identifier of the vector to delete.
+     * @param ref Internal reference to the vector (retrieved via map).
      * @return 0 if successful, or -1 on error.
      */
     int (*delete)(void *, void *);
 
+    /**
+     * Releases internal resources allocated by the index (if any).
+     * @param ref Double pointer to the data/context to release.
+     * @return 0 if successful, or -1 on error.
+     */
     int (*_release)(void **);
 
 } Index;
 
 #ifndef _LIB_CODE
+/**
+ * Returns the version string of the library.
+ */
 extern const char *__LIB_VERSION();
 
 /**
- * Wrapper functions to call the corresponding method in `Index`.
- * These functions ensure safe access and provide a unified interface.
+ * Searches for the `n` nearest neighbors using the provided index.
+ * Wrapper for Index->search_n.
  */
 extern int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *results, int n);
+
+/**
+ * Searches for the closest match using the provided index.
+ * Wrapper for Index->search.
+ */
 extern int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result);
+
+/**
+ * Inserts a vector with its ID into the index.
+ * Wrapper for Index->insert.
+ */
 extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
+
+/**
+ * Deletes a vector from the index by ID.
+ * Wrapper for Index->delete.
+ */
 extern int delete(Index *index, uint64_t id);
 
+/**
+ * Retrieves the internal statistics of the index.
+ */
 extern int stats(Index *Index, IndexStats *stats);
 
+/**
+ * Allocates and initializes a new index of the specified type.
+ * @param type Index type (e.g., FLAT_INDEX).
+ * @param method Distance method (e.g., L2NORM or COSINE).
+ * @param dims Number of dimensions of vectors.
+ * @param icontext Optional context or configuration for index setup.
+ * @return A pointer to the newly allocated index, or NULL on failure.
+ */
 extern Index *alloc_index(int type, int method, uint16_t dims, void *icontext);
+
+/**
+ * Releases all resources associated with the index.
+ * @param index Double pointer to the index to be destroyed.
+ * @return 0 if successful, or -1 on error.
+ */
 extern int destroy_index(Index **index);
 #endif
 
 #endif // __VICTOR_H
+
