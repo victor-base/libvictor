@@ -7,24 +7,19 @@
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
-#define NUM_VECTORS 500000
+#define NUM_VECTORS 1000000
 
 // Cantidad de vectores a insertar
 
 #include <stdio.h>
 
-/**
- * Imprime en consola las estadísticas de tiempo acumuladas para cada operación del índice.
- *
- * @param stats Puntero a la estructura IndexStats que contiene todas las métricas.
- */
 void print_index_stats(const IndexStats *stats) {
     if (!stats) {
-        printf("IndexStats is NULL\n");
+        printf("index_stats is null\n");
         return;
     }
 
-    const char *labels[] = { "INSERT", "DELETE", "SEARCH", "SEARCH_N" };
+    const char *labels[] = { "insert", "delete", "search", "search_n" };
     const TimeStat *all_stats[] = {
         &stats->insert,
         &stats->delete,
@@ -35,14 +30,17 @@ void print_index_stats(const IndexStats *stats) {
     for (int i = 0; i < 4; i++) {
         const TimeStat *s = all_stats[i];
         double avg = (s->count > 0) ? s->total / s->count : 0.0;
-        printf("=== %-8s ===\n", labels[i]);
-        printf("  Count    : %lu\n", s->count);
-        printf("  Total ms : %.3f\n", s->total);
-        printf("  Avg   ms : %.3f\n", avg);
-        printf("  Min   ms : %.3f\n", s->min);
-        printf("  Max   ms : %.3f\n\n", s->max);
+
+        printf("%-9s count = %-8lu total = %9.3f ms    avg = %7.3f ms    min = %7.3f ms    max = %7.3f ms\n",
+               labels[i],
+               s->count,
+               s->total,
+               avg,
+               s->min,
+               s->max);
     }
 }
+
 
 
 // Función auxiliar para generar vectores aleatorios en el rango [-1,1]
@@ -54,7 +52,7 @@ void generate_random_vector(float32_t *vector, uint16_t dims) {
 
 int main() {
     srand(time(NULL)); // Inicializar la semilla de números aleatorios
-    int index_type = FLAT_INDEX, ret;
+    int index_type = FLAT_INDEX_MP, ret;
     int method = COSINE; // Método de prueba
     uint16_t dims = DIMS;
     MatchResult *result;
@@ -83,7 +81,7 @@ int main() {
 
     }
     
-	for ( int i = 0; i < 10; i ++) {
+	for ( int i = 0; i < 50; i ++) {
 		result = calloc(10, sizeof(MatchResult));
 		if ((ret = search_n(index, vector, dims, result, 10)) != 0) {
 			printf("Error en la búsqueda. %d\n", ret);
@@ -92,13 +90,17 @@ int main() {
 		free(result);
 	}
 
-	for ( int i = 0; i < 10; i ++) {
+	for ( int i = 0; i < 50; i ++) {
 		
 		if ((ret = search(index, vector, dims, &r)) != 0) {
 			printf("Error en la búsqueda. %d\n", ret);
 			return 1;
 		}
 		
+	}
+
+	for ( int i= 0; i < 100; i ++) {
+		delete(index, i+200);
 	}
 
 	IndexStats st;

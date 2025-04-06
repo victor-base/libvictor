@@ -166,7 +166,7 @@ int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims) {
 	end = get_time_ms_monotonic();
 	if (ret == SUCCESS) {
 		if ((ret = map_insert(&index->map, id, ref)) != SUCCESS) {
-			PANIC_IF(index->delete(index->data, ref) != SUCCESS, "lack of consistency delete after insert");
+			PANIC_IF(index->delete(index->data, ref) != SUCCESS, "lack of consistency on delete after insert");
 			goto cleanup;
 		}
 		delta = end - start;

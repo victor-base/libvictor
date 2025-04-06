@@ -51,23 +51,18 @@ INodeFlat *search_node(INodeFlat **head, uint64_t id) {
  * @return SUCCESS if deletion was successful, INVALID_ID if not found.
  */
 int delete_node(INodeFlat **head, INodeFlat *node) {
-	PANIC_IF(head == NULL || *head == NULL, "null head in delete node");
-	INodeFlat *curr = *head;
-	while (curr) {
-		if (curr == node) {
-			if (curr->prev) 
-				curr->prev->next = curr->next;
-			else
-				*head = curr->next;
-			if (curr->next)
-				curr->next->prev = curr->prev;
-			free_mem(curr->vector);
-			free_mem(curr);
-			return SUCCESS;
-		}
-		curr = curr->next;
-	}
-	return INVALID_REF;
+    PANIC_IF(head == NULL || *head == NULL || node == NULL, "null pointer in delete_node");
+
+    if (node->prev)
+        node->prev->next = node->next;
+    else
+        *head = node->next;
+
+    if (node->next)
+        node->next->prev = node->prev;
+	free_mem(node->vector);
+	free_mem(node);
+	return SUCCESS;
 }
 
 
