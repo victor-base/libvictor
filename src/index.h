@@ -33,6 +33,37 @@
 #include "victor.h"
 #include "map.h"
 
+#define __LIB_VERSION_MAJOR "0"
+#define __LIB_VERSION_MINOR "1"
+#define __LIB_VERSION_PATCH "10"
+
+
+#if defined(_WIN32) || defined(_WIN64)
+    #define OS "Windows"
+#elif defined(__APPLE__) || defined(__MACH__)
+    #define OS "macOS"
+#elif defined(__linux__)
+    #define OS "Linux"
+#elif defined(__unix__)
+    #define OS "Unix"
+#elif defined(__ANDROID__)
+    #define OS "Android"
+#else
+    #define OS "Unknown OS"
+#endif
+
+#if defined(__x86_64__) || defined(_M_X64)
+    #define ARCH "x86_64"
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    #define ARCH "ARM64"
+#elif defined(__arm__) || defined(_M_ARM)
+    #define ARCH "ARM"
+#elif defined(__i386__) || defined(_M_IX86)
+    #define ARCH "x86"
+#else
+    #define ARCH "Unknown Arch"
+#endif
+
 /**
  * Structure representing an abstract index for vector search.
  * It supports multiple indexing strategies through function pointers.

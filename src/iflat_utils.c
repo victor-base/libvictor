@@ -137,7 +137,7 @@ int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned
 	int i, k;
     for (i = 0; i < n; i++) {
         result[i].distance = cmp->worst_match_value;
-        result[i].id = 0;
+        result[i].id = NULL_ID;
     }
     while (current) {
         distance = cmp->compare_vectors(current->vector->vector, v, dims_aligned);

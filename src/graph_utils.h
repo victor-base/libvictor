@@ -18,7 +18,7 @@ typedef struct graph_node {
 
 #define GRAPH_NODESZ(M) sizeof(GraphNode) + (sizeof(GraphNode *) * (M))
 
-GraphNode *new_graph_node(uint64_t id, float32_t *vector, uint16_t dims, int odegree_max) {
+GraphNode *new_gnode(uint64_t id, float32_t *vector, uint16_t dims, int odegree_max) {
 	GraphNode *node = (GraphNode *) calloc_mem(1, GRAPH_NODESZ(odegree_max));
 
 	if (node == NULL)
