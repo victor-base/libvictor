@@ -36,6 +36,32 @@
 
 
 /**
+ * Structure representing a single node in the hash map.
+ * Each node stores a 64-bit unique ID, a reference to a index struct (ref),
+ * and a pointer to the next node in the same bucket.
+ */
+typedef struct map_node {
+    uint64_t id;
+    void   *ref;
+    struct map_node *next;
+} MapNode;
+
+/**
+ * Structure representing the hash map.
+ * Includes configuration for load factor threshold, total map size,
+ * number of elements currently inserted, and the map buckets.
+ */
+typedef struct {
+    uint16_t lfactor;             // Current load factor
+    uint16_t lfactor_thrhold;     // Load factor threshold for triggering rehash
+    uint32_t mapsize;             // Total number of buckets
+
+    uint64_t elements;            // Total number of elements stored
+    MapNode  **map;               // Array of buckets
+} Map;
+
+
+/**
  * Checks whether the specified ID exists in the map.
  *
  * @param map Pointer to the Map structure.

@@ -41,7 +41,7 @@
 #include <string.h>
 #include "iflat_utils.h"
 #include "method.h"
-#include "victor.h"
+#include "index.h"
 #include "mem.h"
 
 
@@ -370,7 +370,7 @@ int flat_index(Index *idx, int method, uint16_t dims) {
     idx->search_n = flat_search_n;
     idx->insert   = flat_insert;
     idx->delete   = flat_delete;
-    idx->_release = flat_release;
+    idx->release  = flat_release;
 
     return SUCCESS;
 }

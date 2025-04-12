@@ -43,7 +43,7 @@
 #include <unistd.h>
 #include "iflat_utils.h"
 #include "method.h"
-#include "victor.h"
+#include "index.h"
 #include "heap.h"
 #include "mem.h"
 
@@ -394,7 +394,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
 
 	for (i = 0; i < n; i ++ ) {
 		result[i].distance = idx->cmp->worst_match_value;
-		result[i].id = 0;
+		result[i].id = NULL_ID;
 	}
 
 	ret = make_thread_data(&data, idx, vector, dims, n);
@@ -425,7 +425,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
         if (ret != THREAD_ERROR) {
 			for (k = 0; k < n; k ++) {
 				node.distance = data[i].result[k].distance;
-				HEAP_NODE_INT(node.value) = data[i].result[k].id;
+				HEAP_NODE_U64(node.value) = data[i].result[k].id;
 				heap_insert(&heap, &node);
 			}
         }
@@ -435,7 +435,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
 		for ( i = 0; i < n; i++ ) {
 			heap_pop(&heap, &node);
 			result[i].distance = node.distance;
-			result[i].id = HEAP_NODE_INT(node.value);
+			result[i].id = HEAP_NODE_U64(node.value);
 		}
 	}
 	heap_destroy(&heap);
@@ -476,7 +476,6 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
 static int flat_insert_mp(void *index, uint64_t id, float32_t *vector, uint16_t dims, void **ref) {
     IndexFlatMp *ptr = (IndexFlatMp *)index;
     INodeFlat *node;
-    Vector    *nvec;
 
     if (index == NULL)
         return INVALID_INDEX;
@@ -490,13 +489,12 @@ static int flat_insert_mp(void *index, uint64_t id, float32_t *vector, uint16_t 
     if (node == NULL) 
         return SYSTEM_ERROR;
 
-    nvec = make_vector(id, vector, dims);
-    if (nvec == NULL) {
+    node->vector = make_vector(id, vector, dims);
+    if (node->vector == NULL) {
         free_mem(node);
         return SYSTEM_ERROR;
     }
 
-    node->vector = nvec;
     insert_node(&(ptr->heads[(ptr->rr++)%ptr->threads]), node);
     ptr->elements++;
 
@@ -564,7 +562,7 @@ int flat_index_mp(Index *idx, int method, uint16_t dims) {
     idx->search_n = flat_search_n_mp;
     idx->insert   = flat_insert_mp;
     idx->delete   = flat_delete_mp;
-    idx->_release = flat_release_mp;
+    idx->release  = flat_release_mp;
 
     return SUCCESS;
 }

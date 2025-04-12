@@ -43,7 +43,7 @@
 #include "config.h"
 #define __LIB_CODE 1
 
-#include "victor.h"
+#include "index.h"
 #include "mem.h"
 #include "map.h"
 #include "time.h"
@@ -151,6 +151,9 @@ int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims) {
 	void *ref;
 	int ret;
 
+	if (id == NULL_ID)
+		return INVALID_ID;
+
 	if (!index || !index->data || !index->insert)
 		return INVALID_INIT;
 	
@@ -234,11 +237,11 @@ int stats(Index *index, IndexStats *stats) {
  * @return SUCCESS on successful deallocation, INVALID_INIT if the index is already NULL or uninitialized.
  */
 int destroy_index(Index **index) {
-    if (!index || !*index || !(*index)->data || !(*index)->_release) 
+    if (!index || !*index || !(*index)->data || !(*index)->release) 
         return INVALID_INIT;
 
 	pthread_rwlock_wrlock(&(*index)->rwlock);
-    (*index)->_release(&(*index)->data);
+    (*index)->release(&(*index)->data);
 	map_destroy(&(*index)->map);
 	pthread_rwlock_unlock(&(*index)->rwlock);
     pthread_rwlock_destroy(&(*index)->rwlock); 

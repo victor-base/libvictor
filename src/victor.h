@@ -1,5 +1,5 @@
 /*
-* index.h - Index Structure and Management for Vector Database
+* victo.h - Index Structure and Management for Vector Database
 * 
 * Copyright (C) 2025 Emiliano A. Billi
 *
@@ -36,8 +36,10 @@
 
 typedef float float32_t;
 
+#define NULL_ID 0
+
 typedef struct {
-    int id;                  // ID of the matched vector
+    uint64_t  id;                  // ID of the matched vector
     float32_t distance;      // Distance or similarity score
 } MatchResult;
 
@@ -94,97 +96,10 @@ typedef struct {
     TimeStat search_n;   // Multi-search timing
 } IndexStats;
 
-/**
- * Structure representing a single node in the hash map.
- * Each node stores a 64-bit unique ID, a reference to a index struct (ref),
- * and a pointer to the next node in the same bucket.
- */
-typedef struct map_node {
-    uint64_t id;
-    void   *ref;
-    struct map_node *next;
-} MapNode;
-
-/**
- * Structure representing the hash map.
- * Includes configuration for load factor threshold, total map size,
- * number of elements currently inserted, and the map buckets.
- */
-typedef struct {
-    uint16_t lfactor;             // Current load factor
-    uint16_t lfactor_thrhold;     // Load factor threshold for triggering rehash
-    uint32_t mapsize;             // Total number of buckets
-
-    uint64_t elements;            // Total number of elements stored
-    MapNode  **map;               // Array of buckets
-} Map;
-
-
-/**
- * Structure representing an abstract index for vector search.
- * It supports multiple indexing strategies through function pointers.
- */
-typedef struct {
-    char *name;        // Name of the indexing method (e.g., "Flat", "HNSW")
-    void *data;        // Pointer to the specific index data structure
-    void *context;     // Additional context for advanced indexing needs
-
-    IndexStats stats;  // Accumulated timing statistics for operations
-
-    Map map;           // ID-to-node hash map used by all index types
-
-    pthread_rwlock_t rwlock; // Read-write lock for thread-safe access
-
-    /**
-     * Searches for the `n` closest matches to the given vector.
-     * @param data The specific index data structure.
-     * @param vector The input vector.
-     * @param dims The number of dimensions.
-     * @param results Output array to store the closest matches.
-     * @param n The number of matches to retrieve.
-     * @return The number of matches found, or -1 on error.
-     */
-    int (*search_n)(void *, float32_t *, uint16_t, MatchResult *, int);
-
-    /**
-     * Searches for the best match to the given vector.
-     * @param data The specific index data structure.
-     * @param vector The input vector.
-     * @param dims The number of dimensions.
-     * @param result Output structure to store the best match.
-     * @return 0 if successful, or -1 on error.
-     */
-    int (*search)(void *, float32_t *, uint16_t, MatchResult *);
-
-    /**
-     * Inserts a new vector into the index.
-     * @param data The specific index data structure.
-     * @param id The unique identifier for the vector.
-     * @param vector The input vector.
-     * @param dims The number of dimensions.
-     * @param ref Optional output pointer to store the internal reference.
-     * @return 0 if successful, or -1 on error.
-     */
-    int (*insert)(void *, uint64_t, float32_t *, uint16_t, void **ref);
-
-    /**
-     * Deletes a vector from the index using its ID.
-     * @param data The specific index data structure.
-     * @param ref Internal reference to the vector (retrieved via map).
-     * @return 0 if successful, or -1 on error.
-     */
-    int (*delete)(void *, void *);
-
-    /**
-     * Releases internal resources allocated by the index (if any).
-     * @param ref Double pointer to the data/context to release.
-     * @return 0 if successful, or -1 on error.
-     */
-    int (*_release)(void **);
-
-} Index;
-
 #ifndef _LIB_CODE
+
+typedef struct Index Index;
+
 /**
  * Returns the version string of the library.
  */

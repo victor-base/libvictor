@@ -24,8 +24,9 @@
 #include "victor.h"
 #include "mem.h"
 
-#define HEAP_NODE_INT(u)   ((u).i)
-#define HEAP_NODE_PTR(u)   ((u).p)
+#define HEAP_NODE_INT(__u__)   ((__u__).i)
+#define HEAP_NODE_PTR(__u__)   ((__u__).p)
+#define HEAP_NODE_U64(__u__)   ((__u__).u)
 
 #define LCHD(i) (2 * (i) + 1)
 #define RCHD(i) (2 * (i) + 2)
@@ -37,11 +38,14 @@
 #define HEAP_MIN 1
 #define HEAP_MAX 2
 
+
 typedef struct {
 
 	union {
-		int   i;
-		void *p;
+		uint64_t u;
+		int64_t  s;
+		int      i;
+		void    *p;
 	} value;
 
     float32_t distance;

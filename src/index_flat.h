@@ -43,9 +43,7 @@
  #ifndef __FLAT_INDEX_H
  #define __FLAT_INDEX_H 1
  
-
-#include "victor.h"
- 
+#include "index.h"
  /**
   * Initializes a flat index structure.
   *

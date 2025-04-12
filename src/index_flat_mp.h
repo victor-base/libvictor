@@ -43,7 +43,7 @@
  #ifndef __FLAT_INDEX_MP_H
  #define __FLAT_INDEX_MP_H 1
  
-#include "victor.h"
+#include "index.h"
  
 /**
  * Initializes a flat index multiprocess structure.
@@ -60,5 +60,5 @@
  */
 extern int flat_index_mp(Index *idx, int method, uint16_t dims);
  
- #endif
+#endif
  

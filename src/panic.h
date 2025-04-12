@@ -27,22 +27,22 @@
  * This is intentional and by design.
  */
 
- #ifndef _PANIC_H
- #define _PANIC_H 1
+#ifndef _PANIC_H
+#define _PANIC_H 1
+
+#include <stdio.h>
+#include <stdlib.h>
  
- #include <stdio.h>
- #include <stdlib.h>
- 
- /* Always-on panic macro */
- #define PANIC_IF(cond, msg)                         \
-	 do {                                            \
-		 if (cond) {                                 \
-			 fprintf(stderr,                         \
-				 "[CORE PANIC] %s:%d: %s\n",         \
-				 __FILE__, __LINE__, msg);           \
-			 abort();                                \
-		 }                                           \
-	 } while (0)
+/* Always-on panic macro */
+#define PANIC_IF(cond, msg)                         \
+	do {                                            \
+		if (cond) {                                 \
+			fprintf(stderr,                         \
+				"[CORE PANIC] %s:%d: %s\n",         \
+				__FILE__, __LINE__, msg);           \
+			abort();                                \
+		}                                           \
+	} while (0)
 
 
 #endif

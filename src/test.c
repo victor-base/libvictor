@@ -4,6 +4,7 @@
 #include <time.h>
 #include "victor.h"
 #include "config.h"
+#include "panic.h"
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
@@ -26,6 +27,8 @@ void print_index_stats(const IndexStats *stats) {
         &stats->search,
         &stats->search_n
     };
+
+
 
     for (int i = 0; i < 4; i++) {
         const TimeStat *s = all_stats[i];
@@ -67,10 +70,10 @@ int main() {
         printf("Error: No se pudo asignar el índice.\n");
         return 1;
     }
-    
+
     printf("Índice creado correctamente.\n");
 
-    for (int i = 0; i < NUM_VECTORS; i++) {
+    for (int i = 1; i < NUM_VECTORS; i++) {
         
         generate_random_vector(vector, dims);
         
