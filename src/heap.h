@@ -27,6 +27,7 @@
 #define HEAP_NODE_INT(__u__)   ((__u__).i)
 #define HEAP_NODE_PTR(__u__)   ((__u__).p)
 #define HEAP_NODE_U64(__u__)   ((__u__).u)
+#define HEAP_NODE_S64(__u__)   ((__u__).s)
 
 #define LCHD(i) (2 * (i) + 1)
 #define RCHD(i) (2 * (i) + 2)

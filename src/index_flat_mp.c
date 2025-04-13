@@ -61,7 +61,7 @@ typedef struct {
     uint16_t dims;           // Number of dimensions for each vector
     uint16_t dims_aligned;   // Aligned dimensions for efficient memory access
 
-	long threads;            // Number of threads for parallel search
+    long threads;            // Number of threads for parallel search
     int  rr;                 // Round-robin counter for parallel insert
 
 } IndexFlatMp;
@@ -154,7 +154,7 @@ static IndexFlatMp *flat_mp_init(int method, uint16_t dims) {
  */
 static int flat_delete_mp(void *index, void *ref) {
     IndexFlatMp *ptr  = (IndexFlatMp *) index;
-	INodeFlat   *node = (INodeFlat *) ref;
+    INodeFlat   *node = (INodeFlat *) ref;
     int ret;
     int i;
     if (index == NULL) 
@@ -184,7 +184,7 @@ static int flat_delete_mp(void *index, void *ref) {
 void *search_mp_thread(void *arg) {
     ThreadData *data = (ThreadData *)arg;
     flat_linear_search(data->head, data->vector, data->dims, data->result, data->cmp);
-	return NULL;
+    return NULL;
 }
 
 /*
@@ -198,11 +198,11 @@ void *search_mp_thread(void *arg) {
  * @param n    - Number of valid entries to free (i.e., threads initialized).
  */
 static void free_thread_data(ThreadData *data, int n) {
-	for (int i = 0; i < n; i++) {
-		if (data[i].vector) free_aligned_mem(data[i].vector);
-		if (data[i].result) free_mem(data[i].result);
-	}
-	free_mem(data);
+    for (int i = 0; i < n; i++) {
+        if (data[i].vector) free_aligned_mem(data[i].vector);
+        if (data[i].result) free_mem(data[i].result);
+    }
+    free_mem(data);
 }
 
 /*
@@ -230,30 +230,30 @@ static void free_thread_data(ThreadData *data, int n) {
  *         SYSTEM_ERROR if any memory allocation fails.
  */
 static int make_thread_data(ThreadData **data, const IndexFlatMp *idx, const float32_t *vector, uint16_t dims, int rsz) {
-	ThreadData *thread_data = (ThreadData *)calloc_mem(idx->threads, sizeof(ThreadData));
-	if (thread_data == NULL)
-		return SYSTEM_ERROR;
+    ThreadData *thread_data = (ThreadData *)calloc_mem(idx->threads, sizeof(ThreadData));
+    if (thread_data == NULL)
+        return SYSTEM_ERROR;
 
-	for (int i = 0; i < idx->threads; i++) {
-		thread_data[i].vector = (float32_t *)aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
-		if (!thread_data[i].vector) {
-			free_thread_data(thread_data, i);
-			return SYSTEM_ERROR;
-		}
-		thread_data[i].result = (MatchResult *)calloc_mem(rsz, sizeof(MatchResult));
-		if (!thread_data[i].result) {
-			free_aligned_mem(thread_data[i].vector);
-			free_thread_data(thread_data, i);
-			return SYSTEM_ERROR;
-		}
+    for (int i = 0; i < idx->threads; i++) {
+        thread_data[i].vector = (float32_t *)aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
+        if (!thread_data[i].vector) {
+            free_thread_data(thread_data, i);
+            return SYSTEM_ERROR;
+        }
+        thread_data[i].result = (MatchResult *)calloc_mem(rsz, sizeof(MatchResult));
+        if (!thread_data[i].result) {
+            free_aligned_mem(thread_data[i].vector);
+            free_thread_data(thread_data, i);
+            return SYSTEM_ERROR;
+        }
 
-		memcpy(thread_data[i].vector, vector, dims * sizeof(float32_t));
-		thread_data[i].dims = idx->dims_aligned;
-		thread_data[i].cmp  = idx->cmp;
-	}
+        memcpy(thread_data[i].vector, vector, dims * sizeof(float32_t));
+        thread_data[i].dims = idx->dims_aligned;
+        thread_data[i].cmp  = idx->cmp;
+    }
 
-	*data = thread_data;
-	return SUCCESS;
+    *data = thread_data;
+    return SUCCESS;
 }
 
 
@@ -290,7 +290,7 @@ static int make_thread_data(ThreadData **data, const IndexFlatMp *idx, const flo
 static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchResult *result) {
     IndexFlatMp *idx = (IndexFlatMp *)index;
     ThreadData *data;
-	int ret;
+    int ret;
     int i;
 
     // Validate input parameters
@@ -303,26 +303,26 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
     if (result == NULL)
         return INVALID_RESULT;
 
-	// Initialize the result with the worst possible match value
-	result->distance = idx->cmp->worst_match_value;
-	result->id = 0;
+    // Initialize the result with the worst possible match value
+    result->distance = idx->cmp->worst_match_value;
+    result->id = 0;
 
 
-	ret = make_thread_data(&data, idx, vector, dims, 1);
-	if (ret != SUCCESS) 
-		return ret;
+    ret = make_thread_data(&data, idx, vector, dims, 1);
+    if (ret != SUCCESS) 
+        return ret;
 
 
-	ret = SUCCESS;
-	for (i= 0; i < idx->threads; i++) {
-		data[i].head = idx->heads[i];
-		if (pthread_create(&data[i].thread, NULL, search_mp_thread, &data[i])!=0) {
-			ret = THREAD_ERROR;
-			break;
-		}
-			
-	}
-	int join_until = i;
+    ret = SUCCESS;
+    for (i= 0; i < idx->threads; i++) {
+        data[i].head = idx->heads[i];
+        if (pthread_create(&data[i].thread, NULL, search_mp_thread, &data[i])!=0) {
+            ret = THREAD_ERROR;
+            break;
+        }
+            
+    }
+    int join_until = i;
     // Wait for all threads to complete and merge the best results
     for (i = 0; i < join_until; i++) {
         pthread_join(data[i].thread, NULL);
@@ -334,7 +334,7 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
         }
     }
 
-	free_thread_data(data, idx->threads);
+    free_thread_data(data, idx->threads);
     return ret;
 }
 
@@ -375,11 +375,11 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
  */
 static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, MatchResult *result, int n) {
     IndexFlatMp *idx = (IndexFlatMp *)index;
-	HeapNode node;
-	Heap     heap;
+    HeapNode node;
+    Heap     heap;
 
     ThreadData *data;
-	int ret;
+    int ret;
     int i, k;
 
     // Validate input parameters
@@ -392,54 +392,54 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
     if (result == NULL)
         return INVALID_RESULT;
 
-	for (i = 0; i < n; i ++ ) {
-		result[i].distance = idx->cmp->worst_match_value;
-		result[i].id = NULL_ID;
-	}
+    for (i = 0; i < n; i ++ ) {
+        result[i].distance = idx->cmp->worst_match_value;
+        result[i].id = NULL_ID;
+    }
 
-	ret = make_thread_data(&data, idx, vector, dims, n);
-	if (ret != SUCCESS) 
-		return ret;
+    ret = make_thread_data(&data, idx, vector, dims, n);
+    if (ret != SUCCESS) 
+        return ret;
 
-	
-	if (init_heap(&heap, HEAP_MAX, idx->threads * n, idx->cmp->is_better_match) != HEAP_SUCCESS) {
-		free_thread_data(data, idx->threads);
-		return SYSTEM_ERROR; // o un error específico como HEAP_ERROR
-	}
+    
+    if (init_heap(&heap, HEAP_MAX, idx->threads * n, idx->cmp->is_better_match) != HEAP_SUCCESS) {
+        free_thread_data(data, idx->threads);
+        return SYSTEM_ERROR; // o un error específico como HEAP_ERROR
+    }
 
-	ret = SUCCESS;
-	for (i= 0; i < idx->threads; i++) {
-		data[i].head = idx->heads[i];
-		if (pthread_create(&data[i].thread, NULL, search_mp_thread, &data[i])!=0) {
-			ret = THREAD_ERROR;
-			break;
-		}
-			
-	}
-	int join_until = i;
+    ret = SUCCESS;
+    for (i= 0; i < idx->threads; i++) {
+        data[i].head = idx->heads[i];
+        if (pthread_create(&data[i].thread, NULL, search_mp_thread, &data[i])!=0) {
+            ret = THREAD_ERROR;
+            break;
+        }
+            
+    }
+    int join_until = i;
     // Wait for all threads to complete and merge the best results
     for (i = 0; i < join_until; i++) {
         pthread_join(data[i].thread, NULL);
 
         // Compare results from all threads and keep the best match
         if (ret != THREAD_ERROR) {
-			for (k = 0; k < n; k ++) {
-				node.distance = data[i].result[k].distance;
-				HEAP_NODE_U64(node.value) = data[i].result[k].id;
-				heap_insert(&heap, &node);
-			}
+            for (k = 0; k < n; k ++) {
+                node.distance = data[i].result[k].distance;
+                HEAP_NODE_U64(node.value) = data[i].result[k].id;
+                heap_insert(&heap, &node);
+            }
         }
     }
 
-	if (ret != THREAD_ERROR) {
-		for ( i = 0; i < n; i++ ) {
-			heap_pop(&heap, &node);
-			result[i].distance = node.distance;
-			result[i].id = HEAP_NODE_U64(node.value);
-		}
-	}
-	heap_destroy(&heap);
-	free_thread_data(data, idx->threads);
+    if (ret != THREAD_ERROR) {
+        for ( i = 0; i < n; i++ ) {
+            heap_pop(&heap, &node);
+            result[i].distance = node.distance;
+            result[i].id = HEAP_NODE_U64(node.value);
+        }
+    }
+    heap_destroy(&heap);
+    free_thread_data(data, idx->threads);
     return ret;
 }
 
@@ -498,8 +498,8 @@ static int flat_insert_mp(void *index, uint64_t id, float32_t *vector, uint16_t 
     insert_node(&(ptr->heads[(ptr->rr++)%ptr->threads]), node);
     ptr->elements++;
 
-	if (ref)
-		*ref = node;
+    if (ref)
+        *ref = node;
 
     return SUCCESS;
 }

@@ -139,7 +139,7 @@ int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims) {
 	ret = index->insert(index->data, id, vector, dims, &ref);
 	end = get_time_ms_monotonic();
 	if (ret == SUCCESS) {
-		if ((ret = map_insert(&index->map, id, ref)) != SUCCESS) {
+		if ((ret = map_insert(&index->map, id, ref)) != MAP_SUCCESS) {
 			PANIC_IF(index->delete(index->data, ref) != SUCCESS, "lack of consistency on delete after insert");
 			goto cleanup;
 		}
@@ -246,7 +246,7 @@ Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
 	if (idx == NULL || icontext != NULL) 
         return NULL;
 
-	ret = map_init(&idx->map, 10000, 15);
+	ret = init_map(&idx->map, 10000, 15);
 	if (ret != SUCCESS) {
 		free_mem(idx);
 		return NULL;

@@ -192,12 +192,12 @@ int heap_replace(Heap *h, const HeapNode *node) {
 int heap_pop(Heap *h, HeapNode *node) {
 	PANIC_IF(h == NULL, "h is NULL");
 	PANIC_IF(h->heap == NULL, "h->heap is NULL");
-	PANIC_IF(node == NULL, "node is null");
 
 	if (h->e == 0)
 		return HEAP_ERROR_EMPTY;
 
-	*node = h->heap[0];
+	if (!node) 
+		*node = h->heap[0];
 	h->heap[0] = h->heap[--(h->e)];
 	return h->e == 0 ? HEAP_SUCCESS : heapify_down(h);
 }

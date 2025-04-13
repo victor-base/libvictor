@@ -60,9 +60,9 @@ int delete_node(INodeFlat **head, INodeFlat *node) {
 
     if (node->next)
         node->next->prev = node->prev;
-	free_mem(node->vector);
-	free_mem(node);
-	return SUCCESS;
+    free_mem(node->vector);
+    free_mem(node);
+    return SUCCESS;
 }
 
 
@@ -127,14 +127,14 @@ void flat_linear_search(INodeFlat *current, float32_t *v, uint16_t dims_aligned,
  * @return SYSTEM_ERROR or SUCESS
  */
 int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp) {
-	Heap heap;
+    Heap heap;
     HeapNode node;
-	float32_t distance;
+    float32_t distance;
     
-	if (init_heap(&heap, HEAP_MIN, n, cmp->is_better_match) == HEAP_ERROR_ALLOC)
-		return SYSTEM_ERROR;
-	
-	int i, k;
+    if (init_heap(&heap, HEAP_MIN, n, cmp->is_better_match) == HEAP_ERROR_ALLOC)
+        return SYSTEM_ERROR;
+    
+    int i, k;
     for (i = 0; i < n; i++) {
         result[i].distance = cmp->worst_match_value;
         result[i].id = NULL_ID;
@@ -142,28 +142,28 @@ int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned
     while (current) {
         distance = cmp->compare_vectors(current->vector->vector, v, dims_aligned);
 
-		if (heap_full(&heap)) {
-			PANIC_IF(heap_peek(&heap, &node) == HEAP_ERROR_EMPTY, "peek on empty heap");
-			if (cmp->is_better_match(distance, node.distance)) {
-				HEAP_NODE_PTR(node.value) = current;
-				node.distance = distance;
-				PANIC_IF(heap_replace(&heap, &node) == HEAP_ERROR_EMPTY, "replace on empty heap");
-			}
-		} else {
-			HEAP_NODE_PTR(node.value) = current;
-			node.distance = distance;
-			PANIC_IF(heap_insert(&heap, &node) == HEAP_ERROR_FULL, "insert on full heap");
-		}
+        if (heap_full(&heap)) {
+            PANIC_IF(heap_peek(&heap, &node) == HEAP_ERROR_EMPTY, "peek on empty heap");
+            if (cmp->is_better_match(distance, node.distance)) {
+                HEAP_NODE_PTR(node.value) = current;
+                node.distance = distance;
+                PANIC_IF(heap_replace(&heap, &node) == HEAP_ERROR_EMPTY, "replace on empty heap");
+            }
+        } else {
+            HEAP_NODE_PTR(node.value) = current;
+            node.distance = distance;
+            PANIC_IF(heap_insert(&heap, &node) == HEAP_ERROR_FULL, "insert on full heap");
+        }
         current = current->next;
     }
 
-	k = heap_size(&heap);
-	for (k = heap_size(&heap); k > 0; k = heap_size(&heap)) {
-		heap_pop(&heap, &node);
-		result[k-1].distance = node.distance;
-		result[k-1].id = ((INodeFlat *)HEAP_NODE_PTR(node.value))->vector->id;
-	}
+    k = heap_size(&heap);
+    for (k = heap_size(&heap); k > 0; k = heap_size(&heap)) {
+        heap_pop(&heap, &node);
+        result[k-1].distance = node.distance;
+        result[k-1].id = ((INodeFlat *)HEAP_NODE_PTR(node.value))->vector->id;
+    }
 
-	heap_destroy(&heap);
-	return SUCCESS;
+    heap_destroy(&heap);
+    return SUCCESS;
 }

@@ -107,7 +107,7 @@ extern int map_insert(Map *map, uint64_t id, void *ref);
  * @param lfactor_thrhold    Load factor threshold for rehashing.
  * @return SUCCESS on success, error code otherwise.
  */
-extern int map_init(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold);
+extern int init_map(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold);
 
 /**
  * Destroys the map and frees all allocated memory.
@@ -115,5 +115,10 @@ extern int map_init(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold);
  * @param map Pointer to the Map structure to destroy.
  */
 extern void map_destroy(Map *map);
+
+typedef enum {
+    MAP_SUCCESS = 0,             // Operación exitosa
+    MAP_ERROR_ALLOC = -1,        // Error de memoria (calloc/realloc)
+} MapErrorCode;
 
 #endif // __MAP_H

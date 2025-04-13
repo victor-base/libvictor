@@ -109,7 +109,7 @@ static int map_rehash(Map *map, uint32_t new_mapsize) {
 
 	MapNode **new_map = (MapNode **) calloc_mem(new_mapsize, sizeof(MapNode*));
 	if (new_map == NULL)
-		return SYSTEM_ERROR;
+		return MAP_ERROR_ALLOC;
 
 	for (uint32_t i = 0; i < map->mapsize; ++i) {
 		curr = map->map[i];
@@ -126,7 +126,7 @@ static int map_rehash(Map *map, uint32_t new_mapsize) {
 	map->map = new_map;
 	map->mapsize = new_mapsize;
 
-	return SUCCESS;
+	return MAP_SUCCESS;
 }
 
 /**
@@ -138,15 +138,15 @@ int map_insert(Map *map, uint64_t id, void *ref) {
 
 	if (LOAD_FACTOR(map) > map->lfactor_thrhold) {
 		uint32_t new_size = map->mapsize * 2;
-		if (map_rehash(map, new_size) != SUCCESS)
-			return SYSTEM_ERROR;
+		if (map_rehash(map, new_size) != MAP_SUCCESS)
+			return MAP_ERROR_ALLOC;
 	}
 
 	int i = map_hash(map, id);
 
 	MapNode *node = (MapNode *) calloc_mem(1, sizeof(MapNode));
 	if (!node)
-		return SYSTEM_ERROR;
+		return MAP_ERROR_ALLOC;
 
 	node->id = id;
 	node->ref = ref;
@@ -155,26 +155,26 @@ int map_insert(Map *map, uint64_t id, void *ref) {
 
 	map->elements++;
 
-	return SUCCESS;
+	return MAP_SUCCESS;
 }
 
 /**
  * Initializes the map with a specified size and load factor threshold.
  */
-int map_init(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold) {
+int init_map(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold) {
 	if (!map || initial_size == 0)
 		return INVALID_INIT;
 
 	map->map = (MapNode **) calloc_mem(initial_size, sizeof(MapNode*));
 	if (!map->map)
-		return SYSTEM_ERROR;
+		return MAP_ERROR_ALLOC;
 
 	map->mapsize = initial_size;
 	map->lfactor = 0;
 	map->lfactor_thrhold = lfactor_thrhold;
 	map->elements = 0;
 
-	return SUCCESS;
+	return MAP_SUCCESS;
 }
 
 /**
