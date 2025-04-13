@@ -1,5 +1,5 @@
 #Makefile exclusivo de Windows. 
-# - Para ejecutar el makefile: make -f .\Makefile.win, para limpiar: make -f .\Makefile.win  clean
+# - Para ejecutar el makefile: make -f .\Makefile.win, para limpiar: make -f .\Makefile.win clean
 # - Para generar el .exe: gcc -o runtest.exe test.o index.o index_flat.o math.o mem.o method.o vector.o iflat_utils.o index_flat_mp.o heap.o -L. -lvictor
 
 # Nombre de la librería (se generará .dll)
@@ -7,6 +7,9 @@ LIB_NAME = libvictor.dll
 
 # Nombre del ejecutable final
 EXEC = runtest.exe
+
+# Archivos de cabecera (headers)
+HEADERS = config.h index.h mem.h map.h time.h index_flat.h index_flat_mp.h vector.h heap.h math.h panic.h method.h victor.h
 
 # Archivos fuente
 SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c heap.c time.c map.c
@@ -19,16 +22,16 @@ CC = gcc
 CFLAGS = -Wall -g
 
 # Regla para compilar cada archivo fuente .c a archivo objeto .o
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@  # Compilar cada archivo fuente a objeto
+%.o: %.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 # Regla para compilar la librería .dll
 $(LIB_NAME): $(OBJS)
-	$(CC) -shared -o $(LIB_NAME) $(OBJS)  # Crear la librería .dll
+	$(CC) -shared -o $(LIB_NAME) $(OBJS)
 
 # Regla para compilar el ejecutable
-$(EXEC): $(OBJS) $(LIB_NAME)  # Asegurarse de que la librería se haya creado primero
-	$(CC) $(OBJS) -o $(EXEC) -L. -lvictor  # Enlazar los archivos objeto para crear el ejecutable
+$(EXEC): $(OBJS) $(LIB_NAME)
+	$(CC) $(OBJS) -o $(EXEC) -L. -lvictor
 
 # Regla para ejecutar todo (compilar la librería y el ejecutable)
 .PHONY: all
@@ -37,4 +40,4 @@ all: $(LIB_NAME) $(EXEC)
 # Regla para limpiar archivos generados
 .PHONY: clean
 clean:
-	rm -f $(OBJS) $(EXEC) $(LIB_NAME)  # Eliminar los archivos objeto, ejecutable y librería
+	del /Q $(subst /,\,$(OBJS)) $(EXEC) $(LIB_NAME)
