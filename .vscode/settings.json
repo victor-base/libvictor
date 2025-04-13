@@ -57,5 +57,8 @@
   "C_Cpp_Runner.useLinkTimeOptimization": false,
   "C_Cpp_Runner.msvcSecureNoWarnings": false,
   "editor.insertSpaces": false,
-  "editor.detectIndentation": false
+"editor.detectIndentation": false,
+"files.associations": {
+	"__node_handle": "cpp"
+}
 }

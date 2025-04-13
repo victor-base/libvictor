@@ -27,6 +27,7 @@
 #define __MEM_H 1
 
 #include <stdio.h>
+#include <string.h>
 
 extern void *calloc_mem(size_t __count, size_t __size);
 

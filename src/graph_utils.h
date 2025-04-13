@@ -3,16 +3,17 @@
 
 
 #include <stdint.h>
-
+#include <math.h>
 #include "vector.h"
 #include "panic.h"
 #include "heap.h"
 #include "method.h"
 #include "map.h"
+
 #include "mem.h"
 
 /*
-* compute_softlimit - Dynamic softlimit lookup for NSW/HNSW graph construction
+* compute_odegree - Dynamic softlimit lookup for NSW/HNSW graph construction
 *
 * This module provides a fast and portable way to compute the softlimit value used during vector graph insertion.
 * The goal of the softlimit is to determine how many outgoing connections (neighbors) a new node should create.
@@ -51,7 +52,7 @@
 */
 #define HARDLIMIT_M 64
 
-static const uint8_t softlimit_table[] = {
+static const uint8_t odegree_table[] = {
     4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
     14, 15, 16, 19, 22, 26, 32, 38, 45, 53, 64, 64
 };
@@ -72,26 +73,70 @@ static inline int get_msb_index(uint64_t x) {
 #endif
 }
 
-static inline int compute_softlimit(uint64_t N) {
-    if (N < 16) return softlimit_table[0];
+static inline int compute_odegree(uint64_t N) {
+    if (N < 16) return odegree_table[0];
     int index = get_msb_index(N) - 4;  // Offset from 2^4 = 16
-    if (index < 0) return softlimit_table[0];
-    if (index >= (int)(sizeof(softlimit_table))) return softlimit_table[sizeof(softlimit_table) - 1];
-    return softlimit_table[index];
+    if (index < 0) return odegree_table[0];
+    if (index >= (int)(sizeof(odegree_table))) return odegree_table[sizeof(odegree_table) - 1];
+    return odegree_table[index];
+}
+
+static int compute_efConstruction(uint64_t N, int M) {
+    double base = pow((double)N, 0.28);
+    int ef = (int)ceil(base);
+    int min_ef = 3 * M;
+    return ef > min_ef ? ef : min_ef;
+}
+
+
+static int compute_efSearch(uint64_t N, int M, int k) {
+    double base = pow((double)N, 0.35);
+    int ef = (int)ceil(base);
+    int min_ef = 2 * M;
+    int min_recall = 4 * k;
+
+    if (ef < min_ef) ef = min_ef;
+    if (ef < min_recall) ef = min_recall;
+    return ef;
 }
 
 
 
-typedef struct graph_node {
+typedef struct node_nsw {
     Vector *vector;
     int idegree;			// Cantidad de conexiones entrantes, evitar que quede aislado
     int odegree;  			// Cantidad de conexiones salientes actualmente
-    int odegree_hardlimit;	// Limite fijo por memoria para conexiones salientes
-    int odegree_softlimit;	// Limite logico para conexiones salientes
 
     int alive;
-    struct graph_node *neighbors[];
-} GraphNode;
+    struct node_nsw *next;
+    struct node_nsw *neighbors[];
+} INodeNSW;
+
+typedef struct {
+    int efSearch;
+    int efContruct;
+    int od_hard_limit;
+    int od_soft_limit;
+
+    CmpMethod *cmp;          // Comparison method (L2 norm, cosine similarity, etc.)
+
+    uint64_t elements;       // Number of elements stored in the index
+    uint16_t dims;           // Number of dimensions for each vector
+    uint16_t dims_aligned;   // Aligned dimensions for efficient memory access
+    INodeNSW *gentry;
+    INodeNSW *lentry;
+} IndexNSW;
+
+#define OD_PROGESIVE  0x00
+#define EF_AUTOTUNED  0x00
+typedef struct {
+    int efSearch;
+    int efContruct;
+    int odegree;
+} NSWContext;
+
+
+
 
 typedef struct {
     Heap W;
@@ -100,7 +145,25 @@ typedef struct {
     int  k;
 } SearchContext;
 
-int init_search_context(SearchContext *sc, int ef, int k, int (*cmp)(float32_t, float32_t)) {
+
+/**
+ * init_search_context - Initializes the SearchContext used for NSW or HNSW traversal.
+ *
+ * This function sets up the required heaps and visited map for a vector search operation.
+ * It creates:
+ *   - A min-heap `W` to store the best matches found (capacity = ef)
+ *   - A max-heap `C` to store candidates to be explored
+ *   - A hash map `visited` to avoid revisiting nodes
+ *
+ * @param sc   Pointer to the SearchContext to initialize
+ * @param ef   Exploration factor (ef): size of heap W and maximum candidates to track
+ * @param k    Number of results to return (used to trim heap W after search)
+ * @param cmp  Comparison function used to rank distances (e.g., smaller-is-better)
+ *
+ * @return SUCCESS on success, or SYSTEM_ERROR if memory allocation fails
+ */
+
+static int init_search_context(SearchContext *sc, int ef, int k, int (*cmp)(float32_t, float32_t)) {
     PANIC_IF(ef < 0, "invalid parameter ef");
     PANIC_IF(k < 0, "invalid parameter k");
     if (init_heap(&sc->W, HEAP_MIN, ef, cmp) != HEAP_SUCCESS)
@@ -119,21 +182,35 @@ int init_search_context(SearchContext *sc, int ef, int k, int (*cmp)(float32_t, 
 }
 
 /**
+ * destroy_search_context - Releases all resources held by a SearchContext.
+ *
+ * This function destroys both heaps (`W` and `C`) and the visited map,
+ * cleaning up all memory used during the search process.
+ *
+ * @param sc Pointer to the SearchContext to destroy
+ */
+
+static void destroy_search_context(SearchContext *sc) {
+    heap_destroy(&sc->W);
+    heap_destroy(&sc->C);
+    map_destroy(&sc->visited);
+}
+
+/**
  * sc_discard_candidates - Keeps only the top-k elements in the result heap W.
  *
  * This function removes the worst-scoring elements from the max-heap W
  * until only k results remain, based on the value stored in sc->k.
  * Use this after a call to nsw_search if you want to retain exactly k results.
  */
-
-void sc_discard_candidates(SearchContext *sc) {
+static void sc_discard_candidates(SearchContext *sc) {
     int c = heap_size(&sc->W) - sc->k;
     while ( c-- > 0 ) 
         PANIC_IF(heap_pop(&sc->W, NULL) == HEAP_ERROR_EMPTY, "lack of consistency");
 }
 
 /**
- * nsw_search - Performs a navigable small-world graph search from a given entry point.
+ * nsw_explore - Performs a navigable small-world graph search from a given entry point.
  *
  * This function implements the core search mechanism used in NSW/HNSW-based approximate nearest neighbor graphs.
  * It traverses the graph starting from a specified entry node, using a best-first strategy guided by two heaps:
@@ -176,8 +253,8 @@ void sc_discard_candidates(SearchContext *sc) {
  *               else:
  *                   insert into W
  */
-int nsw_search(const GraphNode *entry, SearchContext *sc, float32_t *v, uint16_t dims_aligned, const CmpMethod *cmp) {
-    GraphNode *current, *neighbor;
+static int nsw_explore(const INodeNSW *entry, SearchContext *sc, float32_t *v, uint16_t dims_aligned, const CmpMethod *cmp) {
+    INodeNSW *current, *neighbor;
     float32_t distance;
     HeapNode c_node;
     HeapNode w_node;
@@ -190,20 +267,32 @@ int nsw_search(const GraphNode *entry, SearchContext *sc, float32_t *v, uint16_t
 
     distance = cmp->compare_vectors(v, entry->vector->vector, dims_aligned);
     n_node.distance = distance;
-    HEAP_NODE_PTR(n_node.value) = (GraphNode *)entry;
+    HEAP_NODE_PTR(n_node.value) = (INodeNSW *)entry;
 
-    PANIC_IF(heap_insert(&sc->W, &n_node) != HEAP_SUCCESS, "invalid heap");
-    PANIC_IF(heap_insert(&sc->C, &n_node) != HEAP_SUCCESS, "invalid heap");
+    PANIC_IF(
+        heap_insert(&sc->W, &n_node) != HEAP_SUCCESS,
+        "invalid heap"
+    );
+    PANIC_IF(
+        heap_insert(&sc->C, &n_node) != HEAP_SUCCESS, 
+        "invalid heap"
+    );
 
     while(heap_size(&sc->C) != 0) {
 
-        PANIC_IF(heap_pop(&sc->C, &c_node)  != HEAP_SUCCESS, "lack of consistency");
-        PANIC_IF(heap_peek(&sc->W, &w_node) != HEAP_SUCCESS, "lack of consistency");
+        PANIC_IF(
+            heap_pop(&sc->C, &c_node)  != HEAP_SUCCESS, 
+            "lack of consistency"
+        );
+        PANIC_IF(
+            heap_peek(&sc->W, &w_node) != HEAP_SUCCESS, 
+            "lack of consistency"
+        );
 
         if (heap_full(&sc->W) && cmp->is_better_match(w_node.distance, c_node.distance))
             break;
         
-        current = (GraphNode *) HEAP_NODE_PTR(c_node.value);
+        current = (INodeNSW *) HEAP_NODE_PTR(c_node.value);
         for (i = 0; i < current->odegree; i++) {
             neighbor = current->neighbors[i];
             if (neighbor && neighbor->vector && !map_has(&sc->visited, neighbor->vector->id)) {
@@ -217,28 +306,145 @@ int nsw_search(const GraphNode *entry, SearchContext *sc, float32_t *v, uint16_t
                 distance = cmp->compare_vectors(v, neighbor->vector->vector, dims_aligned);
                 c_node.distance = distance;
                 HEAP_NODE_PTR(c_node.value) = neighbor;
-                PANIC_IF(heap_insert(&sc->C, &c_node) == HEAP_ERROR_FULL, "bad initialization");
+                
+                PANIC_IF(
+                    heap_insert(&sc->C, &c_node) == HEAP_ERROR_FULL, 
+                    "bad initialization"
+                );
 
                 if (heap_full(&sc->W)) {
-                    PANIC_IF(heap_peek(&sc->W, &w_node) == HEAP_ERROR_EMPTY, "error on peek in a full heap");
-                    if (cmp->is_better_match(c_node.distance, w_node.distance))
-                        PANIC_IF(heap_replace(&sc->W, &c_node) != HEAP_SUCCESS, "cannot replace worst node in W");
+                    PANIC_IF(
+                        heap_peek(&sc->W, &w_node) == HEAP_ERROR_EMPTY,
+                        "error on peek in a full heap"
+                    );
+                    if (cmp->is_better_match(c_node.distance, w_node.distance)) {
+                        PANIC_IF(
+                            heap_replace(&sc->W, &c_node) != HEAP_SUCCESS, 
+                            "cannot replace worst node in W"
+                        );
+                    }
                 } else{
-                    PANIC_IF(heap_insert(&sc->W, &c_node) == HEAP_ERROR_FULL, "lack of consistency");
+                    PANIC_IF(
+                        heap_insert(&sc->W, &c_node) == HEAP_ERROR_FULL, 
+                        "lack of consistency"
+                    );
                 }
             }
-        }
-    }
+        } /* for */
+    } /* while */
 
     sc_discard_candidates(sc);
     return SUCCESS;
 }
 
+/**
+ * nsw_search - Search for the top closest neighbors in a NSW index.
+ *
+ * @param index   Pointer to the IndexNSW structure
+ * @param vector  Query vector
+ * @param dims    Number of dimensions (must match index)
+ * @param result  Output array of MatchResult[n], sorted by ascending distance
+ *
+ * @returns ErrorCode (SUCCESS or failure reason)
+ */
+static int nsw_search(void *index, float32_t *vector, uint16_t dims, MatchResult *result) {
+    return nsw_search_n(index, vector, dims, result, 1);
+}
 
-#define GRAPH_NODESZ(M) sizeof(GraphNode) + (sizeof(GraphNode *) * (M))
+/**
+ * nsw_search_n - Search for the top-N closest neighbors in a NSW index.
+ *
+ * @param index   Pointer to the IndexNSW structure
+ * @param vector  Query vector
+ * @param dims    Number of dimensions (must match index)
+ * @param result  Output array of MatchResult[n], sorted by ascending distance
+ * @param n       Number of results to return
+ *
+ * @returns ErrorCode (SUCCESS or failure reason)
+ */
+static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResult *result, int n) {
+    IndexNSW *idx = (IndexNSW *) index;
+    INodeNSW *entry;
+    SearchContext sc;
+    float32_t *v;
+    int ef, ret;
 
-GraphNode *new_gnode(uint64_t id, float32_t *vector, uint16_t dims, int odegree_max) {
-    GraphNode *node = (GraphNode *) calloc_mem(1, GRAPH_NODESZ(odegree_max));
+    if (index == NULL) 
+        return INVALID_INDEX;
+    if (vector == NULL)
+        return INVALID_VECTOR;
+    if (dims != idx->dims) 
+        return INVALID_DIMENSIONS;
+    if (result == NULL)
+        return INVALID_RESULT;
+
+    entry = idx->gentry;
+    if (entry == NULL)
+        return INDEX_EMPTY;
+
+    v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
+	if (v == NULL)
+        return SYSTEM_ERROR;
+
+    memcpy(v, vector, dims * sizeof(float32_t));
+
+    if (idx->efSearch == EF_AUTOTUNED)
+        ef = compute_efSearch(idx->elements, idx->od_soft_limit, n);
+    else
+        ef = idx->efSearch;
+    if (init_search_context(&sc, ef, n, idx->cmp->is_better_match) != SUCCESS) {
+        free_aligned_mem(v);
+        return SYSTEM_ERROR;
+    }
+		
+
+    if ((ret = nsw_explore(entry,&sc,v,idx->dims_aligned, idx->cmp)) == SUCCESS)
+        for (int k = heap_size(&sc.W); k > 0; k = heap_size(&sc.W)) {
+            HeapNode node;
+            heap_pop(&sc.W, &node);
+            result[k-1].distance = node.distance;
+            result[k-1].id = ((INodeNSW *)HEAP_NODE_PTR(node.value))->vector->id;
+        }
+
+    destroy_search_context(&sc);
+    free_aligned_mem(v);
+    return ret;
+}
+
+/*
+ * nsw_release - Releases all resources associated with a flat index.
+ *
+ * @param index - Pointer to the index to be released.
+ *
+ * @return SUCCESS on success, INVALID_INDEX if index is NULL.
+ */
+static int nsw_release(void **index) {
+    if (!index || !*index)
+        return INVALID_INDEX;
+
+    IndexNSW *idx = (IndexNSW *)*index;
+    INodeNSW *ptr;
+
+    ptr = idx->lentry;
+    while (ptr) {
+        idx->lentry = ptr->next;
+        idx->elements--;
+        free_vector(&ptr->vector);
+        free_mem(ptr);
+        ptr = idx->lentry;
+    }
+
+    free_mem(idx);  
+    *index = NULL;
+    return SUCCESS;
+}
+
+
+
+#define GRAPH_NODESZ(M) sizeof(INodeNSW) + (sizeof(INodeNSW *) * (M))
+
+INodeNSW *new_gnode(uint64_t id, float32_t *vector, uint16_t dims, int odegree_max) {
+    INodeNSW *node = (INodeNSW *) calloc_mem(1, GRAPH_NODESZ(odegree_max));
 
     if (node == NULL)
         return NULL;
@@ -253,7 +459,7 @@ GraphNode *new_gnode(uint64_t id, float32_t *vector, uint16_t dims, int odegree_
     return node;
 }
 
-void lazy_delete_gnode(GraphNode *gnode) {
+void lazy_delete_gnode(NSWNode *gnode) {
     PANIC_IF(gnode == NULL, "lazy delete of null gnode");
     gnode->alive = 0;
 }
