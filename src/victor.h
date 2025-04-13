@@ -82,6 +82,7 @@ typedef enum {
 typedef struct {
     uint64_t count;      // Number of operations
     double   total;      // Total time in seconds
+	double   last;		 // Last operation time
     double   min;        // Minimum operation time
     double   max;        // Maximum operation time
 } TimeStat;

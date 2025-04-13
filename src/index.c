@@ -66,6 +66,7 @@ const char *__LIB_VERSION() {
     do {                                               \
         (stat).count++;                                \
         (stat).total += (delta);                       \
+		(stat).last = (delta);						   \
         if ((stat).count == 1) {                       \
             (stat).min = (stat).max = (delta);         \
         } else {                                       \
