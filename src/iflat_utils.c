@@ -167,3 +167,16 @@ int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned
     heap_destroy(&heap);
     return SUCCESS;
 }
+
+
+INodeFlat *make_inodeflat(uint64_t id, float32_t *vector, uint16_t dims) {	
+	INodeFlat *node = (INodeFlat *) calloc_mem(1, sizeof(INodeFlat));
+    
+    if (node) {
+		if ((node->vector = make_vector(id, vector, dims)) == NULL) {
+			free_mem(node);
+			node = NULL;
+		}
+	}
+    return node;
+}

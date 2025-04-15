@@ -59,6 +59,7 @@ typedef enum {
     INVALID_VECTOR,
     INVALID_RESULT,
     INVALID_DIMENSIONS,
+    INVALID_ARGUMENT,
     INVALID_ID,
     INVALID_REF,
     DUPLICATED_ENTRY,
@@ -82,7 +83,7 @@ typedef enum {
 typedef struct {
     uint64_t count;      // Number of operations
     double   total;      // Total time in seconds
-	double   last;		 // Last operation time
+    double   last;		 // Last operation time
     double   min;        // Minimum operation time
     double   max;        // Maximum operation time
 } TimeStat;

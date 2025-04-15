@@ -115,8 +115,8 @@ typedef struct node_nsw {
 typedef struct {
     int efSearch;
     int efContruct;
-    int od_hard_limit;
-    int od_soft_limit;
+    int odegree_hl;
+    int odegree_sl;
 
     CmpMethod *cmp;          // Comparison method (L2 norm, cosine similarity, etc.)
 
@@ -255,7 +255,6 @@ static void sc_discard_candidates(SearchContext *sc) {
  */
 static int nsw_explore(const INodeNSW *entry, SearchContext *sc, float32_t *v, uint16_t dims_aligned, const CmpMethod *cmp) {
     INodeNSW *current, *neighbor;
-    float32_t distance;
     HeapNode c_node;
     HeapNode w_node;
     HeapNode n_node;
@@ -265,8 +264,7 @@ static int nsw_explore(const INodeNSW *entry, SearchContext *sc, float32_t *v, u
     if (ret != MAP_SUCCESS) 
         return SYSTEM_ERROR;
 
-    distance = cmp->compare_vectors(v, entry->vector->vector, dims_aligned);
-    n_node.distance = distance;
+    n_node.distance = cmp->compare_vectors(v, entry->vector->vector, dims_aligned);
     HEAP_NODE_PTR(n_node.value) = (INodeNSW *)entry;
 
     PANIC_IF(
@@ -303,8 +301,7 @@ static int nsw_explore(const INodeNSW *entry, SearchContext *sc, float32_t *v, u
                 if (!neighbor->alive)
                     continue;
 
-                distance = cmp->compare_vectors(v, neighbor->vector->vector, dims_aligned);
-                c_node.distance = distance;
+                c_node.distance = cmp->compare_vectors(v, neighbor->vector->vector, dims_aligned);
                 HEAP_NODE_PTR(c_node.value) = neighbor;
                 
                 PANIC_IF(
@@ -369,14 +366,8 @@ static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResu
     float32_t *v;
     int ef, ret;
 
-    if (index == NULL) 
-        return INVALID_INDEX;
-    if (vector == NULL)
-        return INVALID_VECTOR;
     if (dims != idx->dims) 
         return INVALID_DIMENSIONS;
-    if (result == NULL)
-        return INVALID_RESULT;
 
     entry = idx->gentry;
     if (entry == NULL)
@@ -389,7 +380,7 @@ static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResu
     memcpy(v, vector, dims * sizeof(float32_t));
 
     if (idx->efSearch == EF_AUTOTUNED)
-        ef = compute_efSearch(idx->elements, idx->od_soft_limit, n);
+        ef = compute_efSearch(idx->elements, idx->odegree_sl, n);
     else
         ef = idx->efSearch;
     if (init_search_context(&sc, ef, n, idx->cmp->is_better_match) != SUCCESS) {
@@ -397,11 +388,10 @@ static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResu
         return SYSTEM_ERROR;
     }
 		
-
     if ((ret = nsw_explore(entry,&sc,v,idx->dims_aligned, idx->cmp)) == SUCCESS)
         for (int k = heap_size(&sc.W); k > 0; k = heap_size(&sc.W)) {
             HeapNode node;
-            heap_pop(&sc.W, &node);
+            PANIC_IF(heap_pop(&sc.W, &node) == HEAP_ERROR_EMPTY, "lack of consistency");
             result[k-1].distance = node.distance;
             result[k-1].id = ((INodeNSW *)HEAP_NODE_PTR(node.value))->vector->id;
         }
@@ -419,9 +409,6 @@ static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResu
  * @return SUCCESS on success, INVALID_INDEX if index is NULL.
  */
 static int nsw_release(void **index) {
-    if (!index || !*index)
-        return INVALID_INDEX;
-
     IndexNSW *idx = (IndexNSW *)*index;
     INodeNSW *ptr;
 
@@ -439,11 +426,63 @@ static int nsw_release(void **index) {
     return SUCCESS;
 }
 
+static int nsw_delete(void *index, void *ref) {
+	INodeNSW *ptr = (INodeNSW *) ref;
+	ptr->alive = 0;
+	return SUCCESS;
+}
 
+static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims, void **ref) {
+    SearchContext sc;
+    IndexNSW *idx = (IndexNSW *) index;
+    INodeNSW *node;
+    int ef, ret;
+    
+    if (dims != idx->dims)
+        return INVALID_DIMENSIONS;
+
+    node = make_inodensw(id, vector, dims, HARDLIMIT_M);
+    if (!node) return SYSTEM_ERROR;
+
+    if (idx->elements == 0) {
+        idx->lentry = node;
+        idx->gentry = node;
+        idx->elements++;
+        *ref = node;
+        return SUCCESS;
+    }
+
+    if (idx->efContruct == EF_AUTOTUNED)
+        ef = compute_efConstruction(idx->elements, idx->odegree_sl);
+    else
+        ef = idx->efContruct;
+
+    if (init_search_context(&sc, ef, idx->odegree_sl, idx->cmp->is_better_match) != SUCCESS) {
+        free_vector(&(node->vector));
+        free_mem(node);
+        return SYSTEM_ERROR;
+    }
+
+    if ((ret = nsw_explore(idx->gentry, &sc, node->vector->vector, idx->dims_aligned, idx->cmp)) == SUCCESS) {
+        for (int k = heap_size(&sc.W); k > 0; k = heap_size(&sc.W)) {
+            INodeNSW *neigbor;
+            HeapNode candidate;
+            PANIC_IF(heap_pop(&sc.W, &candidate) == HEAP_ERROR_EMPTY, "lack of consistency");
+            neigbor = (INodeNSW *) HEAP_NODE_PTR(candidate.value);
+            node->neighbors[node->odegree++] = neigbor;
+            // Falta backlinking
+        }
+    } else {
+        free_vector(&(node->vector));
+        free_mem(node);
+    }
+    destroy_search_context(&sc);
+    return ret;
+}
 
 #define GRAPH_NODESZ(M) sizeof(INodeNSW) + (sizeof(INodeNSW *) * (M))
 
-INodeNSW *new_gnode(uint64_t id, float32_t *vector, uint16_t dims, int odegree_max) {
+INodeNSW *make_inodensw(uint64_t id, float32_t *vector, uint16_t dims, int odegree_max) {
     INodeNSW *node = (INodeNSW *) calloc_mem(1, GRAPH_NODESZ(odegree_max));
 
     if (node == NULL)
@@ -455,13 +494,7 @@ INodeNSW *new_gnode(uint64_t id, float32_t *vector, uint16_t dims, int odegree_m
         return NULL;
     }	
 
-    node->odegree_hardlimit = odegree_max;
     return node;
-}
-
-void lazy_delete_gnode(NSWNode *gnode) {
-    PANIC_IF(gnode == NULL, "lazy delete of null gnode");
-    gnode->alive = 0;
 }
 
 

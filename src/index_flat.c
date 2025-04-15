@@ -116,8 +116,6 @@ static int flat_delete(void *index, void *ref) {
     IndexFlat *ptr  = (IndexFlat *)index;
     INodeFlat *node = (INodeFlat *)ref;
 	int ret;
-    if (index == NULL) 
-        return INVALID_INDEX;
 
     if ((ret = delete_node(&(ptr->head),node)) == SUCCESS) {
         ptr->elements--;
@@ -162,15 +160,11 @@ static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
     float32_t *v;
 	int ret;
 
-    if (index == NULL) 
-        return INVALID_INDEX;
-    if (vector == NULL)
-        return INVALID_VECTOR;
     if (dims != idx->dims) 
         return INVALID_DIMENSIONS;
-    if (result == NULL)
-        return INVALID_RESULT;
 
+	if (idx->head == NULL)
+		return INDEX_EMPTY;
 
 	v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
 	if (v == NULL)
@@ -226,14 +220,12 @@ static int flat_search(void *index, float32_t *vector, uint16_t dims, MatchResul
     float32_t *v;
     int ret;
 
-    if (index == NULL) 
-        return INVALID_INDEX;
-    if (vector == NULL)
-        return INVALID_VECTOR;
     if (dims != idx->dims) 
         return INVALID_DIMENSIONS;
-    if (result == NULL)
-        return INVALID_RESULT;
+
+	if (idx->head == NULL)
+		return INDEX_EMPTY;
+
 
 	v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
 	if (v == NULL)
@@ -284,27 +276,13 @@ static int flat_search(void *index, float32_t *vector, uint16_t dims, MatchResul
 static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims, void **ref) {
     IndexFlat *ptr = (IndexFlat *)index;
     INodeFlat *node;
-    Vector    *nvec;
 
-    if (index == NULL)
-        return INVALID_INDEX;
-    if (vector == NULL)
-        return INVALID_VECTOR;
     if (dims != ptr->dims) 
         return INVALID_DIMENSIONS;
 
-    node = (INodeFlat *) calloc_mem(1, sizeof(INodeFlat));
-    
-    if (node == NULL) 
-        return SYSTEM_ERROR;
+	if ((node = make_inodeflat(id, vector, dims)) == NULL)
+		return SYSTEM_ERROR;
 
-    nvec = make_vector(id, vector, dims);
-    if (nvec == NULL) {
-        free_mem(node);
-        return SYSTEM_ERROR;
-    }
-
-    node->vector = nvec;
     insert_node(&(ptr->head), node);
     ptr->elements++;
 
@@ -323,9 +301,6 @@ static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dim
  * @return SUCCESS on success, INVALID_INDEX if index is NULL.
  */
 static int flat_release(void **index) {
-    if (!index || !*index)
-        return INVALID_INDEX;
-
     IndexFlat *idx = *index;
     INodeFlat *ptr;
 

@@ -81,8 +81,12 @@ int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *result
 	double start, end, delta;
 	int ret;
 
-    if (!index || !index->data || !index->search_n)
-        return INVALID_INIT;
+	if (index == NULL)  return INVALID_INDEX;
+	if (vector == NULL) return INVALID_VECTOR;
+	if (results == NULL) return INVALID_RESULT;
+
+	if (index->data == NULL || index->search_n == NULL)
+		return INVALID_INIT;
     
 	pthread_rwlock_rdlock(&index->rwlock);
 	start = get_time_ms_monotonic();
@@ -102,7 +106,11 @@ int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result) 
 	double start, end, delta;
 	int ret;
 
-	if (!index || !index->data || !index->search)
+	if (index == NULL)  return INVALID_INDEX;
+	if (vector == NULL) return INVALID_VECTOR;
+	if (result == NULL) return INVALID_RESULT;
+
+	if (index->data == NULL || index->search == NULL)
 		return INVALID_INIT;
 
 	pthread_rwlock_rdlock(&index->rwlock);
@@ -123,10 +131,11 @@ int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims) {
 	void *ref;
 	int ret;
 
-	if (id == NULL_ID)
-		return INVALID_ID;
+	if (id == NULL_ID)  return INVALID_ID;
+	if (index == NULL)  return INVALID_INDEX;
+	if (vector == NULL) return INVALID_VECTOR;
 
-	if (!index || !index->data || !index->insert)
+	if (index->data == NULL || index->insert == NULL)
 		return INVALID_INIT;
 	
 	pthread_rwlock_wrlock(&index->rwlock);
@@ -158,7 +167,9 @@ int delete(Index *index, uint64_t id) {
 	double start, end, delta;
 	int ret;
 
-	if (!index || !index->data || !index->delete)
+	if (id == NULL_ID)  return INVALID_ID;
+	if (index == NULL)  return INVALID_INDEX;
+	if (!index->data || !index->delete)
 		return INVALID_INIT;
 	
 	pthread_rwlock_wrlock(&index->rwlock);
@@ -185,7 +196,9 @@ cleanup:
 
 int stats(Index *index, IndexStats *stats) {
 	if (!index)
-		return INVALID_INIT;
+		return INVALID_INDEX;
+	if (!stats)
+		return INVALID_ARGUMENT;
 	pthread_rwlock_rdlock(&index->rwlock);
 	*stats = index->stats;
 	pthread_rwlock_unlock(&index->rwlock);
@@ -209,7 +222,9 @@ int stats(Index *index, IndexStats *stats) {
  * @return SUCCESS on successful deallocation, INVALID_INIT if the index is already NULL or uninitialized.
  */
 int destroy_index(Index **index) {
-    if (!index || !*index || !(*index)->data || !(*index)->release) 
+    if (!index || !*index)
+		return INVALID_INDEX;
+	if (!(*index)->data || !(*index)->release) 
         return INVALID_INIT;
 
 	pthread_rwlock_wrlock(&(*index)->rwlock);
