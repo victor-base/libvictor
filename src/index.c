@@ -49,6 +49,8 @@
 #include "time.h"
 #include "index_flat.h"
 #include "index_flat_mp.h"
+#include "index_nsw.h"
+
 
 
 /**
@@ -66,7 +68,7 @@ const char *__LIB_VERSION() {
     do {                                               \
         (stat).count++;                                \
         (stat).total += (delta);                       \
-		(stat).last = (delta);						   \
+        (stat).last = (delta);						   \
         if ((stat).count == 1) {                       \
             (stat).min = (stat).max = (delta);         \
         } else {                                       \
@@ -78,131 +80,131 @@ const char *__LIB_VERSION() {
 
 
 int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *results, int n) {
-	double start, end, delta;
-	int ret;
+    double start, end, delta;
+    int ret;
 
-	if (index == NULL)  return INVALID_INDEX;
-	if (vector == NULL) return INVALID_VECTOR;
-	if (results == NULL) return INVALID_RESULT;
+    if (index == NULL)  return INVALID_INDEX;
+    if (vector == NULL) return INVALID_VECTOR;
+    if (results == NULL) return INVALID_RESULT;
 
-	if (index->data == NULL || index->search_n == NULL)
-		return INVALID_INIT;
+    if (index->data == NULL || index->search_n == NULL)
+        return INVALID_INIT;
     
-	pthread_rwlock_rdlock(&index->rwlock);
-	start = get_time_ms_monotonic();
-	ret = index->search_n(index->data, vector, dims, results, n);
-	end = get_time_ms_monotonic();
+    pthread_rwlock_rdlock(&index->rwlock);
+    start = get_time_ms_monotonic();
+    ret = index->search_n(index->data, vector, dims, results, n);
+    end = get_time_ms_monotonic();
 
-	if (ret == SUCCESS) {
-		delta = end - start;
-		UPDATE_TIMESTAT(index->stats.search_n, delta);
-	}
-	pthread_rwlock_unlock(&index->rwlock);
-	return ret;
+    if (ret == SUCCESS) {
+        delta = end - start;
+        UPDATE_TIMESTAT(index->stats.search_n, delta);
+    }
+    pthread_rwlock_unlock(&index->rwlock);
+    return ret;
 }
 
 
 int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result) {
-	double start, end, delta;
-	int ret;
+    double start, end, delta;
+    int ret;
 
-	if (index == NULL)  return INVALID_INDEX;
-	if (vector == NULL) return INVALID_VECTOR;
-	if (result == NULL) return INVALID_RESULT;
+    if (index == NULL)  return INVALID_INDEX;
+    if (vector == NULL) return INVALID_VECTOR;
+    if (result == NULL) return INVALID_RESULT;
 
-	if (index->data == NULL || index->search == NULL)
-		return INVALID_INIT;
+    if (index->data == NULL || index->search == NULL)
+        return INVALID_INIT;
 
-	pthread_rwlock_rdlock(&index->rwlock);
-	start = get_time_ms_monotonic();
+    pthread_rwlock_rdlock(&index->rwlock);
+    start = get_time_ms_monotonic();
     ret = index->search(index->data, vector, dims, result);
     end = get_time_ms_monotonic();
 
-	if (ret == SUCCESS) {
-		delta = end - start;
-		UPDATE_TIMESTAT(index->stats.search, delta);
-	}
-	pthread_rwlock_unlock(&index->rwlock);
-	return ret;
+    if (ret == SUCCESS) {
+        delta = end - start;
+        UPDATE_TIMESTAT(index->stats.search, delta);
+    }
+    pthread_rwlock_unlock(&index->rwlock);
+    return ret;
 }
 
 int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims) {
-	double start, end, delta;
-	void *ref;
-	int ret;
+    double start, end, delta;
+    void *ref;
+    int ret;
 
-	if (id == NULL_ID)  return INVALID_ID;
-	if (index == NULL)  return INVALID_INDEX;
-	if (vector == NULL) return INVALID_VECTOR;
+    if (id == NULL_ID)  return INVALID_ID;
+    if (index == NULL)  return INVALID_INDEX;
+    if (vector == NULL) return INVALID_VECTOR;
 
-	if (index->data == NULL || index->insert == NULL)
-		return INVALID_INIT;
-	
-	pthread_rwlock_wrlock(&index->rwlock);
+    if (index->data == NULL || index->insert == NULL)
+        return INVALID_INIT;
+    
+    pthread_rwlock_wrlock(&index->rwlock);
 
-	if (map_has(&index->map, id) == 1) {
-		ret = DUPLICATED_ENTRY;
-		goto cleanup;
-	}
+    if (map_has(&index->map, id) == 1) {
+        ret = DUPLICATED_ENTRY;
+        goto cleanup;
+    }
 
-	start = get_time_ms_monotonic();
-	ret = index->insert(index->data, id, vector, dims, &ref);
-	end = get_time_ms_monotonic();
-	if (ret == SUCCESS) {
-		if ((ret = map_insert(&index->map, id, ref)) != MAP_SUCCESS) {
-			PANIC_IF(index->delete(index->data, ref) != SUCCESS, "lack of consistency on delete after insert");
-			goto cleanup;
-		}
-		delta = end - start;
-		UPDATE_TIMESTAT(index->stats.insert, delta);
-	}
+    start = get_time_ms_monotonic();
+    ret = index->insert(index->data, id, vector, dims, &ref);
+    end = get_time_ms_monotonic();
+    if (ret == SUCCESS) {
+        if ((ret = map_insert(&index->map, id, ref)) != MAP_SUCCESS) {
+            PANIC_IF(index->delete(index->data, ref) != SUCCESS, "lack of consistency on delete after insert");
+            goto cleanup;
+        }
+        delta = end - start;
+        UPDATE_TIMESTAT(index->stats.insert, delta);
+    }
 
 cleanup:
-	pthread_rwlock_unlock(&index->rwlock);
-	return ret;
+    pthread_rwlock_unlock(&index->rwlock);
+    return ret;
 }
 
 int delete(Index *index, uint64_t id) {
-	void *ref;
-	double start, end, delta;
-	int ret;
+    void *ref;
+    double start, end, delta;
+    int ret;
 
-	if (id == NULL_ID)  return INVALID_ID;
-	if (index == NULL)  return INVALID_INDEX;
-	if (!index->data || !index->delete)
-		return INVALID_INIT;
-	
-	pthread_rwlock_wrlock(&index->rwlock);
-	start = get_time_ms_monotonic();
+    if (id == NULL_ID)  return INVALID_ID;
+    if (index == NULL)  return INVALID_INDEX;
+    if (!index->data || !index->delete)
+        return INVALID_INIT;
     
-	ref = map_ref(&index->map, id);
-	if (ref == NULL) {
-		ret = NOT_FOUND_ID;
-		goto cleanup;
-	}
+    pthread_rwlock_wrlock(&index->rwlock);
+    start = get_time_ms_monotonic();
+    
+    ref = map_ref(&index->map, id);
+    if (ref == NULL) {
+        ret = NOT_FOUND_ID;
+        goto cleanup;
+    }
 
-	ret = index->delete(index->data, ref);
-	PANIC_IF(ret != SUCCESS, "lack of consistency using index->delete");
-	PANIC_IF(map_remove(&index->map, id) == NULL, "lack of consistency using map_remove");
+    ret = index->delete(index->data, ref);
+    PANIC_IF(ret != SUCCESS, "lack of consistency using index->delete");
+    PANIC_IF(map_remove(&index->map, id) == NULL, "lack of consistency using map_remove");
 
-	end = get_time_ms_monotonic();
-	delta = end - start;
-	UPDATE_TIMESTAT(index->stats.delete, delta);
+    end = get_time_ms_monotonic();
+    delta = end - start;
+    UPDATE_TIMESTAT(index->stats.delete, delta);
 
 cleanup:
-	pthread_rwlock_unlock(&index->rwlock);
-	return ret;
+    pthread_rwlock_unlock(&index->rwlock);
+    return ret;
 }
 
 int stats(Index *index, IndexStats *stats) {
-	if (!index)
-		return INVALID_INDEX;
-	if (!stats)
-		return INVALID_ARGUMENT;
-	pthread_rwlock_rdlock(&index->rwlock);
-	*stats = index->stats;
-	pthread_rwlock_unlock(&index->rwlock);
-	return SUCCESS;
+    if (!index)
+        return INVALID_INDEX;
+    if (!stats)
+        return INVALID_ARGUMENT;
+    pthread_rwlock_rdlock(&index->rwlock);
+    *stats = index->stats;
+    pthread_rwlock_unlock(&index->rwlock);
+    return SUCCESS;
 }
 
 /*
@@ -223,14 +225,14 @@ int stats(Index *index, IndexStats *stats) {
  */
 int destroy_index(Index **index) {
     if (!index || !*index)
-		return INVALID_INDEX;
-	if (!(*index)->data || !(*index)->release) 
+        return INVALID_INDEX;
+    if (!(*index)->data || !(*index)->release) 
         return INVALID_INIT;
 
-	pthread_rwlock_wrlock(&(*index)->rwlock);
+    pthread_rwlock_wrlock(&(*index)->rwlock);
     (*index)->release(&(*index)->data);
-	map_destroy(&(*index)->map);
-	pthread_rwlock_unlock(&(*index)->rwlock);
+    map_destroy(&(*index)->map);
+    pthread_rwlock_unlock(&(*index)->rwlock);
     pthread_rwlock_destroy(&(*index)->rwlock); 
     free_mem(*index);
     *index = NULL;
@@ -259,16 +261,16 @@ int destroy_index(Index **index) {
 Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
     Index *idx = calloc_mem(1, sizeof(Index));
     int ret;
-	if (idx == NULL || icontext != NULL) 
+    if (idx == NULL) 
         return NULL;
 
-	ret = init_map(&idx->map, 10000, 15);
-	if (ret != SUCCESS) {
-		free_mem(idx);
-		return NULL;
-	}
+    ret = init_map(&idx->map, 10000, 15);
+    if (ret != SUCCESS) {
+        free_mem(idx);
+        return NULL;
+    }
 
-	pthread_rwlock_init(&idx->rwlock, NULL);
+    pthread_rwlock_init(&idx->rwlock, NULL);
     switch (type) {
         case FLAT_INDEX:
             if (flat_index(idx, method, dims) != SUCCESS) {
@@ -283,6 +285,14 @@ Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
                 return NULL;
             }
             break;
+
+        case NSW_INDEX:
+            if (nsw_index(idx, method, dims, icontext) != SUCCESS) {
+                free_mem(idx);
+                return NULL;
+            }
+            break;
+
         /*
         Future index types can be added here
         

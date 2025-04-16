@@ -124,7 +124,7 @@ static IndexFlatMp *flat_mp_init(int method, uint16_t dims) {
     }
     index->rr = 0;
     index->threads = get_num_threads();
-    index->heads = calloc(index->threads, sizeof(INodeFlat *));
+    index->heads = calloc_mem(index->threads, sizeof(INodeFlat *));
     index->elements = 0;
     index->dims = dims;
     index->dims_aligned = ALIGN_DIMS(dims);
@@ -378,8 +378,8 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
         return INVALID_DIMENSIONS;
 
 
-	if (idx->elements == 0)
-		return INDEX_EMPTY;
+    if (idx->elements == 0)
+        return INDEX_EMPTY;
 
     for (i = 0; i < n; i ++ ) {
         result[i].distance = idx->cmp->worst_match_value;
@@ -414,7 +414,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
         if (ret != THREAD_ERROR) {
             for (k = 0; k < n; k ++) {
                 node.distance = data[i].result[k].distance;
-                HEAP_NODE_U64(node.value) = data[i].result[k].id;
+                HEAP_NODE_U64(node) = data[i].result[k].id;
                 heap_insert(&heap, &node);
             }
         }
@@ -424,7 +424,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
         for ( i = 0; i < n; i++ ) {
             heap_pop(&heap, &node);
             result[i].distance = node.distance;
-            result[i].id = HEAP_NODE_U64(node.value);
+            result[i].id = HEAP_NODE_U64(node);
         }
     }
     heap_destroy(&heap);
@@ -469,10 +469,10 @@ static int flat_insert_mp(void *index, uint64_t id, float32_t *vector, uint16_t 
     if (dims != ptr->dims) 
         return INVALID_DIMENSIONS;
 
-	if ((node = make_inodeflat(id, vector, dims)) == NULL)
-		return SYSTEM_ERROR;
+    if ((node = make_inodeflat(id, vector, dims)) == NULL)
+        return SYSTEM_ERROR;
     
-	insert_node(&(ptr->heads[(ptr->rr++)%ptr->threads]), node);
+    insert_node(&(ptr->heads[(ptr->rr++)%ptr->threads]), node);
     ptr->elements++;
 
     if (ref)

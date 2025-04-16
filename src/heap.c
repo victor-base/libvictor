@@ -196,7 +196,7 @@ int heap_pop(Heap *h, HeapNode *node) {
     if (h->e == 0)
         return HEAP_ERROR_EMPTY;
 
-    if (!node) 
+    if (node) 
         *node = h->heap[0];
     h->heap[0] = h->heap[--(h->e)];
     return h->e == 0 ? HEAP_SUCCESS : heapify_down(h);

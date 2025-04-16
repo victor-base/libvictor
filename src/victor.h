@@ -98,6 +98,14 @@ typedef struct {
     TimeStat search_n;   // Multi-search timing
 } IndexStats;
 
+#define OD_PROGESIVE  0x00
+#define EF_AUTOTUNED  0x00
+typedef struct {
+    int efSearch;
+    int efContruct;
+    int odegree;
+} NSWContext;
+
 #ifndef _LIB_CODE
 
 typedef struct Index Index;

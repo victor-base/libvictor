@@ -145,12 +145,12 @@ int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned
         if (heap_full(&heap)) {
             PANIC_IF(heap_peek(&heap, &node) == HEAP_ERROR_EMPTY, "peek on empty heap");
             if (cmp->is_better_match(distance, node.distance)) {
-                HEAP_NODE_PTR(node.value) = current;
+                HEAP_NODE_PTR(node) = current;
                 node.distance = distance;
                 PANIC_IF(heap_replace(&heap, &node) == HEAP_ERROR_EMPTY, "replace on empty heap");
             }
         } else {
-            HEAP_NODE_PTR(node.value) = current;
+            HEAP_NODE_PTR(node) = current;
             node.distance = distance;
             PANIC_IF(heap_insert(&heap, &node) == HEAP_ERROR_FULL, "insert on full heap");
         }
@@ -161,7 +161,7 @@ int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned
     for (k = heap_size(&heap); k > 0; k = heap_size(&heap)) {
         heap_pop(&heap, &node);
         result[k-1].distance = node.distance;
-        result[k-1].id = ((INodeFlat *)HEAP_NODE_PTR(node.value))->vector->id;
+        result[k-1].id = ((INodeFlat *)HEAP_NODE_PTR(node))->vector->id;
     }
 
     heap_destroy(&heap);
@@ -170,13 +170,13 @@ int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned
 
 
 INodeFlat *make_inodeflat(uint64_t id, float32_t *vector, uint16_t dims) {	
-	INodeFlat *node = (INodeFlat *) calloc_mem(1, sizeof(INodeFlat));
+    INodeFlat *node = (INodeFlat *) calloc_mem(1, sizeof(INodeFlat));
     
     if (node) {
-		if ((node->vector = make_vector(id, vector, dims)) == NULL) {
-			free_mem(node);
-			node = NULL;
-		}
-	}
+        if ((node->vector = make_vector(id, vector, dims)) == NULL) {
+            free_mem(node);
+            node = NULL;
+        }
+    }
     return node;
 }
