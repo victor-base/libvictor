@@ -98,11 +98,14 @@ typedef struct {
     TimeStat search_n;   // Multi-search timing
 } IndexStats;
 
+/*
+ * NSW Specific Struct
+ */
 #define OD_PROGESIVE  0x00
 #define EF_AUTOTUNED  0x00
 typedef struct {
-    int efSearch;
-    int efContruct;
+    int ef_search;
+    int ef_construct;
     int odegree;
 } NSWContext;
 
@@ -114,6 +117,11 @@ typedef struct Index Index;
  * Returns the version string of the library.
  */
 extern const char *__LIB_VERSION();
+
+/**
+ * Returns the short version string of the library x.y.z.
+ */
+extern const char *__LIB_SHORT_VERSION();
 
 /**
  * Searches for the `n` nearest neighbors using the provided index.
@@ -140,10 +148,18 @@ extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
 extern int delete(Index *index, uint64_t id);
 
 /**
+ * Update Index Context 
+ */
+extern int update_icontext(Index *index, void *icontext);
+
+/**
  * Retrieves the internal statistics of the index.
  */
 extern int stats(Index *Index, IndexStats *stats);
 
+extern int size(Index *index, uint64_t *sz);
+
+extern int contains(Index *index, uint64_t id);
 /**
  * Allocates and initializes a new index of the specified type.
  * @param type Index type (e.g., FLAT_INDEX).

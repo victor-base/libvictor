@@ -8,7 +8,7 @@
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
-#define NUM_VECTORS 500000
+#define NUM_VECTORS 200000
 
 // Cantidad de vectores a insertar
 
@@ -63,8 +63,8 @@ int main() {
 	MatchResult r;
     float32_t vector[DIMS];
     
-	context.efContruct = 64;
-	context.efSearch = 100;
+	context.ef_construct = 64;
+	context.ef_search = 100;
 	context.odegree = 32;
     printf("%s\n", __LIB_VERSION());
     

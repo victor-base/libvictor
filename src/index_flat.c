@@ -115,7 +115,7 @@ static IndexFlat *flat_init(int method, uint16_t dims) {
 static int flat_delete(void *index, void *ref) {
     IndexFlat *ptr  = (IndexFlat *)index;
     INodeFlat *node = (INodeFlat *)ref;
-	int ret;
+    int ret;
 
     if ((ret = delete_node(&(ptr->head),node)) == SUCCESS) {
         ptr->elements--;
@@ -158,17 +158,17 @@ static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
     IndexFlat *idx = (IndexFlat *)index;
     INodeFlat *current;
     float32_t *v;
-	int ret;
+    int ret;
 
     if (dims != idx->dims) 
         return INVALID_DIMENSIONS;
 
-	if (idx->head == NULL)
-		return INDEX_EMPTY;
+    if (idx->head == NULL)
+        return INDEX_EMPTY;
 
-	v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
-	if (v == NULL)
-		return SYSTEM_ERROR;
+    v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
+    if (v == NULL)
+        return SYSTEM_ERROR;
 
     memcpy(v, vector, dims * sizeof(float32_t));
 
@@ -176,10 +176,10 @@ static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
     if (current == NULL) {
         ret = INDEX_EMPTY;
     } else {
-		ret = flat_linear_search_n(current, v, idx->dims_aligned, result, n, idx->cmp);
-	}
+        ret = flat_linear_search_n(current, v, idx->dims_aligned, result, n, idx->cmp);
+    }
 
-	free_aligned_mem(v);
+    free_aligned_mem(v);
     return ret;
 }
 
@@ -223,23 +223,23 @@ static int flat_search(void *index, float32_t *vector, uint16_t dims, MatchResul
     if (dims != idx->dims) 
         return INVALID_DIMENSIONS;
 
-	if (idx->head == NULL)
-		return INDEX_EMPTY;
+    if (idx->head == NULL)
+        return INDEX_EMPTY;
 
 
-	v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
-	if (v == NULL)
-		return SYSTEM_ERROR;
+    v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
+    if (v == NULL)
+        return SYSTEM_ERROR;
 
-	memcpy(v, vector, dims * sizeof(float32_t));
+    memcpy(v, vector, dims * sizeof(float32_t));
 
     current = idx->head;
     if (current == NULL) {
         ret = INDEX_EMPTY;
     } else {
-		flat_linear_search(current, v, idx->dims_aligned, result, idx->cmp);
-		ret = SUCCESS;
-	}
+        flat_linear_search(current, v, idx->dims_aligned, result, idx->cmp);
+        ret = SUCCESS;
+    }
 
     free_aligned_mem(v);
     return ret;
@@ -280,14 +280,14 @@ static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dim
     if (dims != ptr->dims) 
         return INVALID_DIMENSIONS;
 
-	if ((node = make_inodeflat(id, vector, dims)) == NULL)
-		return SYSTEM_ERROR;
+    if ((node = make_inodeflat(id, vector, dims)) == NULL)
+        return SYSTEM_ERROR;
 
     insert_node(&(ptr->head), node);
     ptr->elements++;
 
-	if (ref != NULL)
-		*ref = node;
+    if (ref != NULL)
+        *ref = node;
 
     return SUCCESS;
 }

@@ -41,36 +41,6 @@ typedef struct node_nsw {
 } INodeNSW;
 
 
-
-/*
- * Prints the contents of an INodeNSW for debugging purposes.
- */
-void print_inodensw(const INodeNSW *node) {
-    if (!node) {
-        printf("INodeNSW: NULL\n");
-        fflush(stdout);
-        return;
-    }
-
-    printf("INodeNSW at %p\n", (void *)node);
-    printf("  id       : %lu\n", node->vector ? node->vector->id : 0);
-    printf("  alive    : %s\n", node->alive ? "yes" : "no");
-    printf("  idegree  : %d\n", node->idegree);
-    printf("  odegree  : %d\n", node->odegree);
-    printf("  neighbors:\n");
-
-    for (int i = 0; i < node->odegree; i++) {
-        if (node->neighbors[i] && node->neighbors[i]->vector) {
-            printf("    [%d] → id=%lu\n", i, node->neighbors[i]->vector->id);
-        } else {
-            printf("    [%d] → NULL\n", i);
-        }
-    }
-
-    fflush(stdout);
-}
-
-
 /**
  * Represents the state and configuration of an NSW (Navigable Small World) graph index.
  *
@@ -78,8 +48,8 @@ void print_inodensw(const INodeNSW *node) {
  * and search operations, including degree limits, dimensionality, and search parameters.
  *
  * Fields:
- *  - efSearch: Exploration factor used during search (number of candidates to keep).
- *  - efContruct: Exploration factor used during insertion (breadth of graph walk).
+ *  - ef_search: Exploration factor used during search (number of candidates to keep).
+ *  - ef_construct: Exploration factor used during insertion (breadth of graph walk).
  *  - odegree_hl: Max out-degree (hard limit) for any node (strict cap).
  *  - odegree_sl: Soft out-degree limit, used during insertion and replacement heuristics.
  *
@@ -93,8 +63,9 @@ void print_inodensw(const INodeNSW *node) {
  *  - lentry: Local entry point (could be replaced periodically for insertion heuristics).
  */
 typedef struct {
-    int efSearch;
-    int efContruct;
+    int ef_search;
+    int ef_construct;
+	int odegree_computed;
     int odegree_hl;
     int odegree_sl;
 
@@ -116,6 +87,8 @@ typedef struct {
     int  k;
 } SearchContext;
 
+#define GRAPH_NODESZ(M) sizeof(INodeNSW) + (sizeof(INodeNSW *) * (M))
+
 /*--------------------------------------------------*
  *    Degree and exploration parameter utilities     *
  *--------------------------------------------------*/
@@ -126,14 +99,14 @@ typedef struct {
 static inline int compute_odegree(uint64_t N);
 
 /*
- * Computes the efConstruction parameter for insertions.
+ * Computes the ef_construction parameter for insertions.
  */
-static int compute_efConstruction(uint64_t N, int M);
+static int compute_ef_construction(uint64_t N, int M);
 
 /*
- * Computes the efSearch parameter for search operations.
+ * Computes the ef_search parameter for search operations.
  */
-static int compute_efSearch(uint64_t N, int M, int k);
+static int compute_ef_search(uint64_t N, int M, int k);
 
 /*
  * Computes the position of the most significant bit in a 64-bit integer.
@@ -314,10 +287,10 @@ static inline int compute_odegree(uint64_t N) {
 }
 
 /**
- * Computes the `efConstruction` value for the insertion process in NSW/HNSW.
+ * Computes the `ef_construction` value for the insertion process in NSW/HNSW.
  *
  * This value determines how broadly the graph will be explored when inserting
- * a new node. A higher `efConstruction` generally leads to better connectivity
+ * a new node. A higher `ef_construction` generally leads to better connectivity
  * and quality at the cost of more computation.
  *
  * The function adapts based on the index size `N`, using a power-law function,
@@ -328,10 +301,10 @@ static inline int compute_odegree(uint64_t N) {
  *  - M: Maximum out-degree (connectivity constraint).
  *
  * Returns:
- *  - A dynamically tuned `efConstruction` value, guaranteed to be ≥ 3 * M.
+ *  - A dynamically tuned `ef_construction` value, guaranteed to be ≥ 3 * M.
  */
 
-static int compute_efConstruction(uint64_t N, int M) {
+static int compute_ef_construction(uint64_t N, int M) {
     double base = pow((double)N, 0.28);
     int ef = (int)ceil(base);
     int min_ef = 3 * M;
@@ -339,7 +312,7 @@ static int compute_efConstruction(uint64_t N, int M) {
 }
 
 /**
- * Computes the `efSearch` value for querying the NSW index.
+ * Computes the `ef_search` value for querying the NSW index.
  *
  * This parameter controls the search breadth — how many candidates
  * are kept during traversal. A higher value generally improves recall
@@ -356,10 +329,10 @@ static int compute_efConstruction(uint64_t N, int M) {
  *  - k: Number of nearest neighbors to retrieve.
  *
  * Returns:
- *  - A tuned `efSearch` value that balances recall and efficiency.
+ *  - A tuned `ef_search` value that balances recall and efficiency.
  */
 
-static int compute_efSearch(uint64_t N, int M, int k) {
+static int compute_ef_search(uint64_t N, int M, int k) {
     double base = pow((double)N, 0.35);
     int ef = (int)ceil(base);
     int min_ef = 2 * M;
@@ -386,7 +359,7 @@ static int compute_efSearch(uint64_t N, int M, int k) {
  * degree constraints based on either a provided context or default heuristics.
  *
  * Behavior:
- *  - If `context` is NULL, `efSearch` and `efContruct` will be set to EF_AUTOTUNED.
+ *  - If `context` is NULL, `ef_search` and `ef_construct` will be set to EF_AUTOTUNED.
  *  - `odegree_sl` is computed progressively if context is missing or explicitly
  *    set to `OD_PROGESIVE`, otherwise it uses a fixed hard limit (`HARDLIMIT_M`).
  *  - The comparison method is selected using the integer `method` parameter,
@@ -416,15 +389,19 @@ static IndexNSW *nsw_init(int method, uint16_t dims, NSWContext *context) {
     index->gentry = NULL;
     index->lentry = NULL;
     index->elements = 0;
+	index->odegree_computed = 0;
+
     index->dims = dims;
     index->dims_aligned = ALIGN_DIMS(dims);
-    index->efSearch   = context == NULL ? EF_AUTOTUNED : context->efSearch;
-    index->efContruct = context == NULL ? EF_AUTOTUNED: context->efContruct;
+    index->ef_search   = context == NULL ? EF_AUTOTUNED : context->ef_search;
+    index->ef_construct = context == NULL ? EF_AUTOTUNED : context->ef_construct;
     index->odegree_hl = HARDLIMIT_M;
-    if (context == NULL || context->odegree == OD_PROGESIVE) 
+    if (context == NULL || context->odegree == OD_PROGESIVE) {
+		index->odegree_computed = 1;
         index->odegree_sl = compute_odegree(0);
-    else
-        index->odegree_sl = HARDLIMIT_M;
+	} else {
+        index->odegree_sl = context->odegree;
+	}
     return index;
 }
 
@@ -638,7 +615,7 @@ static int nsw_search(void *index, float32_t *vector, uint16_t dims, MatchResult
  *
  * The search begins from the global entry point (`gentry`) and explores the graph
  * using a best-first strategy. The breadth of exploration is controlled by the
- * `efSearch` parameter (either fixed or auto-tuned). Results are written to the
+ * `ef_search` parameter (either fixed or auto-tuned). Results are written to the
  * provided `result` array in descending priority (i.e., `result[0]` holds the
  * farthest among the top-n matches).
  *
@@ -680,10 +657,10 @@ static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResu
 
     memcpy(v, vector, dims * sizeof(float32_t));
 
-    if (idx->efSearch == EF_AUTOTUNED)
-        ef = compute_efSearch(idx->elements, idx->odegree_sl, n);
+    if (idx->ef_search == EF_AUTOTUNED)
+        ef = compute_ef_search(idx->elements, idx->odegree_sl, n);
     else
-        ef = idx->efSearch;
+        ef = idx->ef_search;
     if (init_search_context(&sc, ef, n, idx->cmp->is_better_match) != SUCCESS) {
         free_aligned_mem(v);
         return SYSTEM_ERROR;
@@ -728,6 +705,7 @@ static int nsw_release(void **index) {
 }
 
 static int nsw_delete(void *index, void *ref) {
+	if (!index) return INVALID_INDEX;
 	INodeNSW *ptr = (INodeNSW *) ref;
 	ptr->alive = 0;
 	return SUCCESS;
@@ -741,7 +719,7 @@ static int nsw_delete(void *index, void *ref) {
  *  - It creates a new graph node with storage for the vector and neighbor slots.
  *  - If the index is empty, it initializes the graph entry points.
  *  - Otherwise, it searches for the closest existing nodes using the current entry point
- *    and the `efConstruction` parameter to control the exploration breadth.
+ *    and the `ef_construction` parameter to control the exploration breadth.
  *  - It connects the new node to the top-k nearest neighbors discovered, applying
  *    symmetric connections when allowed via `nsw_connect_to()`.
  *
@@ -782,10 +760,10 @@ static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims
         return SUCCESS;
     }
 
-    if (idx->efContruct == EF_AUTOTUNED)
-        ef = compute_efConstruction(idx->elements, idx->odegree_sl);
+    if (idx->ef_construct == EF_AUTOTUNED)
+        ef = compute_ef_construction(idx->elements, idx->odegree_sl);
     else
-        ef = idx->efContruct;
+        ef = idx->ef_construct;
 
     if (init_search_context(&sc, ef, idx->odegree_sl, idx->cmp->is_better_match) != SUCCESS) {
         free_vector(&(node->vector));
@@ -806,12 +784,13 @@ static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims
         free_vector(&(node->vector));
         free_mem(node);
     }
-	idx->odegree_sl = compute_odegree(idx->elements);
+	if (idx->odegree_computed)
+		idx->odegree_sl = compute_odegree(idx->elements);
     destroy_search_context(&sc);
     return ret;
 }
 
-#define GRAPH_NODESZ(M) sizeof(INodeNSW) + (sizeof(INodeNSW *) * (M))
+
 
 /**
  * Allocates and initializes a new INodeNSW structure with space for the specified
