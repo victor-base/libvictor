@@ -59,6 +59,13 @@
   "editor.insertSpaces": false,
 "editor.detectIndentation": false,
 "files.associations": {
-	"__node_handle": "cpp"
+	"__node_handle": "cpp",
+	"__bit_reference": "cpp",
+	"bitset": "cpp",
+	"deque": "cpp",
+	"limits": "cpp",
+	"optional": "cpp",
+	"ratio": "cpp",
+	"vector": "cpp"
 }
 }

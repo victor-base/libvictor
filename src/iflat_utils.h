@@ -94,4 +94,6 @@ extern void flat_linear_search(INodeFlat *current, float32_t *v, uint16_t dims_a
  */
 extern int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp);
 
+
+extern INodeFlat *make_inodeflat(uint64_t id, float32_t *vector, uint16_t dims);
 #endif

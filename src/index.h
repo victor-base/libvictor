@@ -33,9 +33,9 @@
 #include "victor.h"
 #include "map.h"
 
-#define __LIB_VERSION_MAJOR "0"
-#define __LIB_VERSION_MINOR "1"
-#define __LIB_VERSION_PATCH "10"
+#define __LIB_VERSION_MAJOR "1"
+#define __LIB_VERSION_MINOR "0"
+#define __LIB_VERSION_PATCH "1"
 
 
 #if defined(_WIN32) || defined(_WIN64)

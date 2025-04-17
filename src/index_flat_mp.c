@@ -124,7 +124,7 @@ static IndexFlatMp *flat_mp_init(int method, uint16_t dims) {
     }
     index->rr = 0;
     index->threads = get_num_threads();
-    index->heads = calloc(index->threads, sizeof(INodeFlat *));
+    index->heads = calloc_mem(index->threads, sizeof(INodeFlat *));
     index->elements = 0;
     index->dims = dims;
     index->dims_aligned = ALIGN_DIMS(dims);
@@ -157,8 +157,6 @@ static int flat_delete_mp(void *index, void *ref) {
     INodeFlat   *node = (INodeFlat *) ref;
     int ret;
     int i;
-    if (index == NULL) 
-        return INVALID_INDEX;
 
     for (i = 0; i < ptr->threads; i++) {
         if ((ret = delete_node(&(ptr->heads[i]),node)) == SUCCESS) {
@@ -293,15 +291,8 @@ static int flat_search_mp(void *index, float32_t *vector, uint16_t dims, MatchRe
     int ret;
     int i;
 
-    // Validate input parameters
-    if (index == NULL) 
-        return INVALID_INDEX;
-    if (vector == NULL)
-        return INVALID_VECTOR;
     if (dims != idx->dims) 
         return INVALID_DIMENSIONS;
-    if (result == NULL)
-        return INVALID_RESULT;
 
     // Initialize the result with the worst possible match value
     result->distance = idx->cmp->worst_match_value;
@@ -382,15 +373,13 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
     int ret;
     int i, k;
 
-    // Validate input parameters
-    if (index == NULL) 
-        return INVALID_INDEX;
-    if (vector == NULL)
-        return INVALID_VECTOR;
+
     if (dims != idx->dims) 
         return INVALID_DIMENSIONS;
-    if (result == NULL)
-        return INVALID_RESULT;
+
+
+    if (idx->elements == 0)
+        return INDEX_EMPTY;
 
     for (i = 0; i < n; i ++ ) {
         result[i].distance = idx->cmp->worst_match_value;
@@ -425,7 +414,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
         if (ret != THREAD_ERROR) {
             for (k = 0; k < n; k ++) {
                 node.distance = data[i].result[k].distance;
-                HEAP_NODE_U64(node.value) = data[i].result[k].id;
+                HEAP_NODE_U64(node) = data[i].result[k].id;
                 heap_insert(&heap, &node);
             }
         }
@@ -435,7 +424,7 @@ static int flat_search_n_mp(void *index, float32_t *vector, uint16_t dims, Match
         for ( i = 0; i < n; i++ ) {
             heap_pop(&heap, &node);
             result[i].distance = node.distance;
-            result[i].id = HEAP_NODE_U64(node.value);
+            result[i].id = HEAP_NODE_U64(node);
         }
     }
     heap_destroy(&heap);
@@ -477,24 +466,12 @@ static int flat_insert_mp(void *index, uint64_t id, float32_t *vector, uint16_t 
     IndexFlatMp *ptr = (IndexFlatMp *)index;
     INodeFlat *node;
 
-    if (index == NULL)
-        return INVALID_INDEX;
-    if (vector == NULL)
-        return INVALID_VECTOR;
     if (dims != ptr->dims) 
         return INVALID_DIMENSIONS;
 
-    node = (INodeFlat *) calloc_mem(1, sizeof(INodeFlat));
+    if ((node = make_inodeflat(id, vector, dims)) == NULL)
+        return SYSTEM_ERROR;
     
-    if (node == NULL) 
-        return SYSTEM_ERROR;
-
-    node->vector = make_vector(id, vector, dims);
-    if (node->vector == NULL) {
-        free_mem(node);
-        return SYSTEM_ERROR;
-    }
-
     insert_node(&(ptr->heads[(ptr->rr++)%ptr->threads]), node);
     ptr->elements++;
 
@@ -514,9 +491,6 @@ static int flat_insert_mp(void *index, uint64_t id, float32_t *vector, uint16_t 
  */
 static int flat_release_mp(void **index) {
     int i;
-    if (!index || !*index)
-        return INVALID_INDEX;
-
     IndexFlatMp *idx = *index;
     INodeFlat *ptr;
 

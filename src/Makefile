@@ -9,7 +9,7 @@ ifeq ($(OS), Linux)
     TARGET = testdb
     LIBNAME = libvictor.so
     CC = gcc
-    CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
+    CFLAGS = -g -Wall -Wextra -O3 -march=native -fPIC
 else ifeq ($(OS), Darwin)
 	TARGET = testdb.macos
 	LIBNAME = libvictor.dylib
@@ -19,7 +19,7 @@ endif
 
 # Source files & .obj instructiosm
 
-SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c heap.c time.c map.c 
+SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c heap.c time.c map.c index_nsw.c
 OBJS = $(SRCS:.c=.o)
 
 LDFLAGS = -lm -lpthread
