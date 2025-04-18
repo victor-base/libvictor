@@ -56,7 +56,7 @@ void generate_random_vector(float32_t *vector, uint16_t dims) {
 int main() {
 	NSWContext context;
     srand(time(NULL)); // Inicializar la semilla de números aleatorios
-    int index_type = FLAT_INDEX, ret;
+    int index_type = NSW_INDEX, ret;
     int method = COSINE; // Método de prueba
     uint16_t dims = DIMS;
     MatchResult *result;
@@ -116,7 +116,7 @@ int main() {
 	stats(index, &st);
 	print_index_stats(&st);
     destroy_index(&index);
-
+	free(result);
     printf("Prueba finalizada correctamente.\n");
 	getchar();
     return 0;
