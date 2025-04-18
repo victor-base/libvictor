@@ -42,7 +42,7 @@ typedef struct {
     float32_t worst_match_value;  // Worst possible score for this metric
     int       (*is_better_match) (float32_t, float32_t);  // Function to compare match quality
     float32_t (*compare_vectors) (float32_t *, float32_t *, int);  // Function to compute similarity/distance
- } CmpMethod;
+} CmpMethod;
  
 
 /**

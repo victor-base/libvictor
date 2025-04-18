@@ -48,6 +48,7 @@ typedef struct {
  */
 #define L2NORM 0x00  // Euclidean Distance
 #define COSINE 0x01  // Cosine Similarity
+#define DOTP   0x02  // Dot Product
 
 /**
  * Enumeration of error codes returned by index operations.

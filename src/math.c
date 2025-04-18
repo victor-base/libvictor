@@ -204,3 +204,60 @@ int cosine_similarity_best(float32_t a, float32_t b)
 {
     return (a > b) ? 1 : 0;
 }
+
+/**
+ * @brief Computes the dot product between two vectors.
+ *
+ *
+ * @param v1 Pointer to the first vector (array of float32_t).
+ * @param v2 Pointer to the second vector (array of float32_t).
+ * @param dims The number of dimensions (size) of the vectors.
+ * @return The dot product value, ranging from -1 to 1.
+ *
+ * @note A value of `1.0` indicates identical direction, `0.0` means the vectors
+ *       are orthogonal (no similarity), and `-1.0` indicates opposite directions.
+ * @note Both vectors must have the same dimensionality (`dims`).
+ * @note This function assumes that the input vectors are aligned and that `dims`
+ *       is a multiple of 4 for optimal SIMD performance.
+ * @note If either vector has a zero magnitude, the function returns `0.0`
+ *       to avoid division by zero.
+ */
+float32_t dot_product(float32_t *v1, float32_t *v2, int dims)
+{
+    float32_t dot = 0.0f;
+    int i;
+
+#ifdef __ARM_NEON
+    float32x4_t acc_dot = vdupq_n_f32(0.0f);
+    
+    for (i = 0; i < dims; i += 4)
+    {
+        float32x4_t a = vld1q_f32(v1 + i);
+        float32x4_t b = vld1q_f32(v2 + i);
+
+        acc_dot = vmlaq_f32(acc_dot, a, b);
+    }
+    dot = vaddvq_f32(acc_dot);
+
+#elif defined(__SSE__)
+    __m128 acc_dot = _mm_setzero_ps();
+
+    for (i = 0; i < dims; i += 4)
+    {
+        __m128 a = _mm_load_ps(v1 + i);
+        __m128 b = _mm_load_ps(v2 + i);
+
+        acc_dot = _mm_add_ps(acc_dot, _mm_mul_ps(a, b)); // Dot product
+    }
+
+    __m128 temp = _mm_add_ps(acc_dot, _mm_movehl_ps(acc_dot, acc_dot));
+    dot = _mm_cvtss_f32(_mm_add_ss(temp, _mm_shuffle_ps(temp, temp, 1)));
+
+
+#else //Fallback case
+    for (i = 0; i < dims; i++) {
+        dot += v1[i] * v2[i];
+    }
+#endif
+    return dot;
+}
