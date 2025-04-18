@@ -116,7 +116,7 @@ int main() {
 	stats(index, &st);
 	print_index_stats(&st);
     destroy_index(&index);
-
+	free(result);
     printf("Prueba finalizada correctamente.\n");
 	getchar();
     return 0;
