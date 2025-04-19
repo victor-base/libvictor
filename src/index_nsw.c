@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 #include "vector.h"
@@ -6,78 +7,9 @@
 #include "method.h"
 #include "index.h"
 #include "map.h"
-
+#include "index_nsw.h"
+#include "store_nsw.h"
 #include "mem.h"
-
-
-#include <stdio.h>
-
-
-/**
- * Represents a node in the NSW (Navigable Small World) graph.
- *
- * Each node stores a vector and maintains bidirectional graph information,
- * including incoming and outgoing edges to other nodes. This structure is designed
- * for dynamic graph construction and allows pruning and entry-point promotion
- * strategies based on degree counts.
- *
- * Fields:
- *  - vector: The actual vector data associated with this node.
- *  - idegree: Number of incoming connections (used to avoid isolation).
- *  - odegree: Current number of outgoing connections stored in `neighbors`.
- *  - alive: Flag indicating whether the node is active or logically deleted.
- *  - next: Optional pointer for linking nodes (e.g., for memory pools or linked lists).
- *  - neighbors[]: Flexible array of pointers to outgoing neighbor nodes.
- *                 This array is allocated dynamically based on max degree at creation time.
- */
-typedef struct node_nsw {
-    Vector *vector;
-    int idegree;			
-    int odegree;  			
-
-    int alive;
-    struct node_nsw *next;
-    struct node_nsw *neighbors[];
-} INodeNSW;
-
-
-/**
- * Represents the state and configuration of an NSW (Navigable Small World) graph index.
- *
- * This structure contains global settings and metadata used to guide both insertion
- * and search operations, including degree limits, dimensionality, and search parameters.
- *
- * Fields:
- *  - ef_search: Exploration factor used during search (number of candidates to keep).
- *  - ef_construct: Exploration factor used during insertion (breadth of graph walk).
- *  - odegree_hl: Max out-degree (hard limit) for any node (strict cap).
- *  - odegree_sl: Soft out-degree limit, used during insertion and replacement heuristics.
- *
- *  - cmp: Pointer to the vector comparison method (e.g., L2, cosine).
- *
- *  - elements: Number of elements currently inserted in the index.
- *  - dims: Original number of dimensions of each vector.
- *  - dims_aligned: Aligned dimensionality for SIMD-friendly memory layout (e.g., padded to 4/8/16).
- *
- *  - gentry: Global entry point to the graph (usually the first or farthest inserted node).
- *  - lentry: Local entry point (could be replaced periodically for insertion heuristics).
- */
-typedef struct {
-    int ef_search;
-    int ef_construct;
-	int odegree_computed;
-    int odegree_hl;
-    int odegree_sl;
-
-    CmpMethod *cmp;          
-
-    uint64_t elements;       
-    uint16_t dims;           
-    uint16_t dims_aligned;
-    INodeNSW *gentry;
-    INodeNSW *lentry;
-} IndexNSW;
-
 
 
 typedef struct {
@@ -521,7 +453,7 @@ static int nsw_explore(const INodeNSW *entry, SearchContext *sc, float32_t *v, u
     HeapNode n_node;
     int ret, i;
    
-    ret = map_insert(&sc->visited, entry->vector->id, NULL);
+    ret = map_insert_p(&sc->visited, entry->vector->id, NULL);
     if (ret != MAP_SUCCESS) 
         return SYSTEM_ERROR;
 
@@ -555,7 +487,7 @@ static int nsw_explore(const INodeNSW *entry, SearchContext *sc, float32_t *v, u
         for (i = 0; i < current->odegree; i++) {
             neighbor = current->neighbors[i];
             if (neighbor && neighbor->vector && !map_has(&sc->visited, neighbor->vector->id)) {
-                ret = map_insert(&sc->visited, neighbor->vector->id, NULL);
+                ret = map_insert_p(&sc->visited, neighbor->vector->id, NULL);
                 if (ret != MAP_SUCCESS) 
                     return SYSTEM_ERROR;
 
@@ -704,6 +636,7 @@ static int nsw_release(void **index) {
     return SUCCESS;
 }
 
+
 static int nsw_delete(void *index, void *ref) {
 	if (!index) return INVALID_INDEX;
 	INodeNSW *ptr = (INodeNSW *) ref;
@@ -759,6 +692,8 @@ static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims
         *ref = node;
         return SUCCESS;
     }
+	node->next = idx->lentry;
+	idx->lentry = node;
 
     if (idx->ef_construct == EF_AUTOTUNED)
         ef = compute_ef_construction(idx->elements, idx->odegree_sl);
@@ -968,6 +903,7 @@ int nsw_index(Index *idx, int method, uint16_t dims, NSWContext *context) {
     idx->search   = nsw_search;
     idx->search_n = nsw_search_n;
     idx->insert   = nsw_insert;
+	idx->dump     = nsw_dump;
     idx->delete   = nsw_delete;
     idx->release  = nsw_release;
 

@@ -33,23 +33,23 @@
 /**
  * Computes the bucket index for a given ID using modulo hashing.
  */
-static inline uint32_t map_hash(const Map *map, uint64_t id) {
+static inline uint32_t map_hash(const Map *map, uint64_t key) {
 	PANIC_IF(map == NULL, "map null in map_hash");
-	return id % map->mapsize;
+	return key % map->mapsize;
 }
 
 /**
- * Checks whether an entry with the given ID exists in the map.
+ * Checks whether an entry with the given key exists in the map.
  */
-int map_has(const Map *map, uint64_t id) {
-	int i = map_hash(map, id);
+int map_has(const Map *map, uint64_t key) {
+	int i = map_hash(map, key);
 	MapNode *ptr;
 
 	PANIC_IF(map == NULL, "map null in map_has");
 
 	ptr = map->map[i];
 	while (ptr) {
-		if (ptr->id == id)
+		if (ptr->key == key)
 			return 1;
 		ptr = ptr->next;
 	}
@@ -57,45 +57,53 @@ int map_has(const Map *map, uint64_t id) {
 }
 
 /**
- * Checks whether an entry with the given ID exists in the map and retun ref pointer.
+ * Checks whether an entry with the given key exists in the map and retun ref pointer.
  */
-void *map_ref(const Map *map, uint64_t id) {
-	int i = map_hash(map, id);
+uint64_t map_get(const Map *map, uint64_t key) {
+	int i = map_hash(map, key);
 	MapNode *ptr;
 
 	PANIC_IF(map == NULL, "map null in map_has");
 
 	ptr = map->map[i];
 	while (ptr) {
-		if (ptr->id == id)
-			return ptr->ref;
+		if (ptr->key == key)
+			return ptr->value;
 		ptr = ptr->next;
 	}
-	return NULL;
+	return 0;
+}
+
+void *map_get_p(const Map *map, uint64_t key) {
+	return (void *)(uintptr_t) map_get(map, key);
 }
 
 /**
- * Removes and returns the reference associated with the given ID.
+ * Removes and returns the reference associated with the given key.
  */
-void *map_remove(Map *map, uint64_t id) {
+uint64_t map_remove(Map *map, uint64_t key) {
 	PANIC_IF(map == NULL, "map null in map_remove");
 
-	int i = map_hash(map, id);
+	int i = map_hash(map, key);
 	MapNode **pp = &map->map[i];
 	MapNode *node;
 
 	while ((node = *pp)) {
-		if (node->id == id) {
+		if (node->key == key) {
 			*pp = node->next;
-			void *ref = node->ref;
+			uint64_t value = node->value;
 			free_mem(node);
 			map->elements--;
-			return ref;
+			return value;
 		}
 		pp = &node->next;
 	}
 
-	return NULL;
+	return 0;
+}
+
+void *map_remove_p(Map *map, uint64_t key) {
+	return (void *)(uintptr_t) map_remove(map, key);
 }
 
 /**
@@ -115,7 +123,7 @@ static int map_rehash(Map *map, uint32_t new_mapsize) {
 		curr = map->map[i];
 		while (curr) {
 			next = curr->next;
-			j = curr->id % new_mapsize;
+			j = curr->key % new_mapsize;
 			curr->next = new_map[j];
 			new_map[j] = curr;
 			curr = next;
@@ -132,7 +140,7 @@ static int map_rehash(Map *map, uint32_t new_mapsize) {
 /**
  * Inserts a new entry into the map, with automatic rehashing if needed.
  */
-int map_insert(Map *map, uint64_t id, void *ref) {
+int map_insert(Map *map, uint64_t key, uint64_t value) {
 	PANIC_IF(map == NULL, "map null in map_insert");
 	PANIC_IF(map->mapsize == 0, "map has invalid mapsize in insert");
 
@@ -142,20 +150,24 @@ int map_insert(Map *map, uint64_t id, void *ref) {
 			return MAP_ERROR_ALLOC;
 	}
 
-	int i = map_hash(map, id);
+	int i = map_hash(map, key);
 
 	MapNode *node = (MapNode *) calloc_mem(1, sizeof(MapNode));
 	if (!node)
 		return MAP_ERROR_ALLOC;
 
-	node->id = id;
-	node->ref = ref;
+	node->key = key;
+	node->value = value;
 	node->next = map->map[i];
 	map->map[i] = node;
 
 	map->elements++;
 
 	return MAP_SUCCESS;
+}
+
+int map_insert_p(Map *map, uint64_t key, void* value) {
+	return map_insert(map, key, (uint64_t)(uintptr_t) value);
 }
 
 /**

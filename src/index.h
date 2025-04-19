@@ -119,6 +119,21 @@ typedef struct Index {
      */
     int (*delete)(void *, void *);
 
+	/**
+     * Serializes the current state of the index and writes it to disk.
+     *
+     * This function creates a persistent on-disk representation of the index,
+     * including vector data, internal structures (e.g., graph or flat layout),
+     * and metadata required for reconstruction via a future load.
+     *
+     * The actual format and implementation are index-specific.
+     *
+     * @param data The specific index data structure (e.g., Flat, NSW, HNSW).
+     * @param filename Path to the file where the index should be dumped.
+     * @return 0 if successful, or -1 on error.
+     */
+	int (*dump)(void *, const char *);
+
     /**
      * Releases internal resources allocated by the index (if any).
      * @param ref Double pointer to the data/context to release.

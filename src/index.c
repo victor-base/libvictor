@@ -53,6 +53,7 @@
 
 
 
+
 /**
  * Returns the version of the library.
  */
@@ -230,11 +231,12 @@ int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims) {
         goto cleanup;
     }
 
+
     start = get_time_ms_monotonic();
     ret = index->insert(index->data, id, vector, dims, &ref);
     end = get_time_ms_monotonic();
     if (ret == SUCCESS) {
-        if ((ret = map_insert(&index->map, id, ref)) != MAP_SUCCESS) {
+        if ((ret = map_insert_p(&index->map, id, ref)) != MAP_SUCCESS) {
             PANIC_IF(index->delete(index->data, ref) != SUCCESS, "lack of consistency on delete after insert");
             goto cleanup;
         }
@@ -286,7 +288,7 @@ int delete(Index *index, uint64_t id) {
     pthread_rwlock_wrlock(&index->rwlock);
     start = get_time_ms_monotonic();
     
-    ref = map_ref(&index->map, id);
+    ref = map_get_p(&index->map, id);
     if (ref == NULL) {
         ret = NOT_FOUND_ID;
         goto cleanup;
@@ -294,7 +296,7 @@ int delete(Index *index, uint64_t id) {
 
     ret = index->delete(index->data, ref);
     PANIC_IF(ret != SUCCESS, "lack of consistency using index->delete");
-    PANIC_IF(map_remove(&index->map, id) == NULL, "lack of consistency using map_remove");
+    PANIC_IF(map_remove_p(&index->map, id) == NULL, "lack of consistency using map_remove");
 
     end = get_time_ms_monotonic();
     delta = end - start;
@@ -391,6 +393,42 @@ int contains(Index *index, uint64_t id) {
 	return ret;
 }
 
+/*
+ * Dumps the current index state to a file on disk.
+ *
+ * This function serializes the internal structure and data of the index,
+ * including vectors, metadata, and any algorithm-specific state (e.g., graph links).
+ * The resulting file can later be used to restore the index via a corresponding load operation.
+ *
+ * @param index - Pointer to the index instance.
+ * @param filename - Path to the output file where the index will be saved.
+ *
+ * @return SUCCESS on success,
+ *         INVALID_INDEX if the index is NULL,
+ *         NOT_IMPLEMENTED if the index type does not support dumping,
+ *         or SYSTEM_ERROR on I/O failure.
+ */
+int dump(Index *index, const char *filename) {
+	double start, end, delta;
+	int ret;
+	if (!index)
+		return INVALID_INDEX;
+	
+	if (index->dump == NULL)
+		return NOT_IMPLEMENTED;
+
+	pthread_rwlock_rdlock(&index->rwlock);
+	start = get_time_ms_monotonic();
+
+	ret = index->dump(index->data, filename);
+	end = get_time_ms_monotonic();
+    if (ret == SUCCESS) {
+        delta = end - start;
+        UPDATE_TIMESTAT(index->stats.dump, delta);
+    }
+	pthread_rwlock_unlock(&index->rwlock);
+	return ret;
+}
 
 /*
  * Destroys and deallocates an index.
@@ -423,6 +461,7 @@ int destroy_index(Index **index) {
     *index = NULL;
     return SUCCESS;
 }
+
 
 
 /*

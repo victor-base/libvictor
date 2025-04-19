@@ -8,7 +8,7 @@
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
-#define NUM_VECTORS 50000
+#define NUM_VECTORS 100000
 
 // Cantidad de vectores a insertar
 
@@ -20,17 +20,18 @@ void print_index_stats(const IndexStats *stats) {
         return;
     }
 
-    const char *labels[] = { "insert", "delete", "search", "search_n" };
+    const char *labels[] = { "insert", "delete", "search", "search_n", "dump" };
     const TimeStat *all_stats[] = {
         &stats->insert,
         &stats->delete,
         &stats->search,
-        &stats->search_n
+        &stats->search_n,
+		&stats->dump,
     };
 
 
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         const TimeStat *s = all_stats[i];
         double avg = (s->count > 0) ? s->total / s->count : 0.0;
 
@@ -108,6 +109,8 @@ int main() {
 		
 	}
 
+	dump(index, "nsw.idx");
+
 	for ( int i= 0; i < 100; i ++) {
 		delete(index, i+200);
 	}
@@ -116,7 +119,6 @@ int main() {
 	stats(index, &st);
 	print_index_stats(&st);
     destroy_index(&index);
-	free(result);
     printf("Prueba finalizada correctamente.\n");
 	getchar();
     return 0;
