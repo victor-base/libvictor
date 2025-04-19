@@ -41,8 +41,8 @@
  * and a pointer to the next node in the same bucket.
  */
 typedef struct map_node {
-    uint64_t id;
-    void   *ref;
+    uint64_t key;
+    uint64_t value;
     struct map_node *next;
 } MapNode;
 
@@ -68,7 +68,7 @@ typedef struct {
  * @param id  ID to search for.
  * @return 1 if ID exists, 0 otherwise.
  */
-extern int map_has(const Map *map, uint64_t id);
+extern int map_has(const Map *map, uint64_t key);
 
 /**
  * Checks whether the specified ID exists in the map and get it.
@@ -77,8 +77,8 @@ extern int map_has(const Map *map, uint64_t id);
  * @param id  ID to search for.
  * @return pointer to the ref or null
  */
-extern void *map_ref(const Map *map, uint64_t id);
-
+extern uint64_t map_get(const Map *map, uint64_t key);
+extern void *map_get_p(const Map *map, uint64_t key);
 /**
  * Removes an entry with the given ID from the map.
  *
@@ -86,8 +86,8 @@ extern void *map_ref(const Map *map, uint64_t id);
  * @param id  ID of the entry to remove.
  * @return Pointer to the removed reference, or NULL if not found.
  */
-extern void *map_remove(Map *map, uint64_t id);
-
+extern uint64_t map_remove(Map *map, uint64_t key);
+extern void *map_remove_p(Map *map, uint64_t key);
 /**
  * Inserts a new entry into the map.
  * Triggers a rehash if the load factor exceeds the threshold.
@@ -97,8 +97,8 @@ extern void *map_remove(Map *map, uint64_t id);
  * @param ref Pointer to the reference to store.
  * @return SUCCESS on success, error code otherwise.
  */
-extern int map_insert(Map *map, uint64_t id, void *ref);
-
+extern int map_insert(Map *map, uint64_t key, uint64_t value);
+extern int map_insert_p(Map *map, uint64_t key, void *value);
 /**
  * Initializes the map with a given initial size and load factor threshold.
  *

@@ -1,3 +1,5 @@
 *.o
 *.exe
 .idea/*
+*.idx
+*.macos

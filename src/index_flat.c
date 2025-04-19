@@ -344,6 +344,7 @@ int flat_index(Index *idx, int method, uint16_t dims) {
     idx->search   = flat_search;
     idx->search_n = flat_search_n;
     idx->insert   = flat_insert;
+	idx->dump     = NULL;
     idx->delete   = flat_delete;
     idx->release  = flat_release;
 

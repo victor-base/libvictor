@@ -68,6 +68,7 @@ typedef enum {
     INDEX_EMPTY,
     THREAD_ERROR,
     SYSTEM_ERROR,
+	NOT_IMPLEMENTED,
 } ErrorCode;
 
 /**
@@ -95,6 +96,7 @@ typedef struct {
 typedef struct {
     TimeStat insert;     // Insert operations timing
     TimeStat delete;     // Delete operations timing
+	TimeStat dump;       // Dump to file operation
     TimeStat search;     // Single search timing
     TimeStat search_n;   // Multi-search timing
 } IndexStats;
@@ -155,11 +157,59 @@ extern int update_icontext(Index *index, void *icontext);
 
 /**
  * Retrieves the internal statistics of the index.
+ *
+ * This function copies the internal timing and operation statistics
+ * (insert, delete, search, search_n) into the provided `IndexStats` structure.
+ *
+ * @param index - Pointer to the index instance.
+ * @param stats - Pointer to the structure where statistics will be stored.
+ *
+ * @return SUCCESS on success, INVALID_INDEX or INVALID_ARGUMENT on error.
  */
-extern int stats(Index *Index, IndexStats *stats);
+extern int stats(Index *index, IndexStats *stats);
 
+/**
+ * Retrieves the current number of elements in the index.
+ *
+ * This function returns the number of vector entries currently stored
+ * in the index, regardless of their internal structure or state.
+ *
+ * @param index - Pointer to the index instance.
+ * @param sz - Pointer to a uint64_t that will receive the size.
+ *
+ * @return SUCCESS on success, INVALID_INDEX on error.
+ */
 extern int size(Index *index, uint64_t *sz);
 
+/**
+ * Dumps the current index state to a file on disk.
+ *
+ * This function serializes the internal structure and data of the index,
+ * including vectors, metadata, and any algorithm-specific state (e.g., graph links).
+ * The resulting file can later be used to restore the index via a corresponding load operation.
+ *
+ * @param index - Pointer to the index instance.
+ * @param filename - Path to the output file where the index will be saved.
+ *
+ * @return SUCCESS on success,
+ *         INVALID_INDEX if the index is NULL,
+ *         NOT_IMPLEMENTED if the index type does not support dumping,
+ *         or SYSTEM_ERROR on I/O failure.
+ */
+extern int dump(Index *index, const char *filename);
+
+
+/**
+ * Checks whether a given vector ID exists in the index.
+ *
+ * This function verifies the presence of a vector with the specified ID
+ * within the index's internal map structure.
+ *
+ * @param index - Pointer to the index instance.
+ * @param id - The unique vector ID to check.
+ *
+ * @return 1 if the ID is found, 0 if not, or 0 if the index is NULL.
+ */
 extern int contains(Index *index, uint64_t id);
 /**
  * Allocates and initializes a new index of the specified type.

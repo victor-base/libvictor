@@ -39,16 +39,19 @@
   */
  static CmpMethod __methods[] = {
      { // L2NORM: Euclidean Distance
-         .worst_match_value = INFINITY,              // Worst match is infinite distance
-         .is_better_match = euclidean_distance_best, // Function to determine best match
-         .compare_vectors = euclidean_distance,      // Function to compute L2 norm distance
+		.type = 0,
+        .worst_match_value = INFINITY,              // Worst match is infinite distance
+        .is_better_match = euclidean_distance_best, // Function to determine best match
+        .compare_vectors = euclidean_distance,      // Function to compute L2 norm distance
      },
      { // COSINE: Cosine Similarity
-         .worst_match_value = -1.0,                  // Worst match is -1 (opposite vectors)
-         .is_better_match = cosine_similarity_best,  // Function to determine best match
-         .compare_vectors = cosine_similarity,       // Function to compute cosine similarity
+        .type = 1,
+		.worst_match_value = -1.0,                  // Worst match is -1 (opposite vectors)
+        .is_better_match = cosine_similarity_best,  // Function to determine best match
+        .compare_vectors = cosine_similarity,       // Function to compute cosine similarity
      },
 	  { // DOTP: Dot Product
+		.type = 2,
 		.worst_match_value = -1.0,                  // Worst match is -1 (opposite vectors)
 		.is_better_match = cosine_similarity_best,  // Function to determine best match
 		.compare_vectors = dot_product,       // Function to compute cosine similarity
