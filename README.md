@@ -29,7 +29,7 @@ This RC of `libvictor` lays the foundation for a fast, embeddable and flexible v
 - [x] **Flat Index** — Stable & Functional
 - [x] **Graph Index** — NSW Stable & Functional  
 - [x] **Deletion** — Deferred delete / mark inactive  
-- [ ] **Bindings** — Python / Go / Java — In progress 🚧 
+- [ ] **Bindings** — Python / Go / Java — In progress / C# 🚧 
 - [ ] **Persistence** — `dump()` and `load()` — In progress 🚧 
 - [ ] **Benchmarks** — In progress 🚧  
 - [x] **Docs** — Public API complete 📄  
