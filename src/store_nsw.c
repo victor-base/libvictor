@@ -70,8 +70,8 @@ static void nsw_inode2snode(SNodeNSW *dst, INodeNSW *src, int max_neighbors, Map
 	uint64_t voffset = map_get(vat, (uint64_t)(uintptr_t) src->vector);
 	PANIC_IF(voffset == 0, "Invalid vector disk address");
 	dst->vector = voffset;
-	dst->odegree = (u_int8_t) src->odegree;
-	dst->alive   = (u_int8_t) src->alive;
+	dst->odegree = (uint8_t) src->odegree;
+	dst->alive   = (uint8_t) src->alive;
 	for (i = 0; i < src->odegree; i++) {
 		uint64_t noffset = map_get(nat, (uint64_t)(uintptr_t) src->neighbors[i]);
 		PANIC_IF(noffset == 0, "invalid neighbor disk address");
