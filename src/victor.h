@@ -223,6 +223,8 @@ extern int contains(Index *index, uint64_t id);
  */
 extern Index *alloc_index(int type, int method, uint16_t dims, void *icontext);
 
+extern Index *load_index(const char *filename);
+
 /**
  * Releases all resources associated with the index.
  * @param index Double pointer to the index to be destroyed.

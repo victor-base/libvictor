@@ -109,7 +109,7 @@ int main() {
 		
 	}
 
-	dump(index, "nsw.idx");
+	printf("%d", dump(index, "nsw.idx"));
 
 	for ( int i= 0; i < 100; i ++) {
 		delete(index, i+200);
@@ -119,6 +119,29 @@ int main() {
 	stats(index, &st);
 	print_index_stats(&st);
     destroy_index(&index);
+
+	index = load_index("nsw.idx");
+	if (!index) {
+        printf("Error: No se pudo asignar el índice.\n");
+        return 1;
+    }
+	for ( int i = 0; i < 50; i ++) {
+		
+		if ((ret = search(index, vector, dims, &r)) != 0) {
+			printf("Error en la búsqueda. %d\n", ret);
+			return 1;
+		}
+		printf("Result: %d\n", r.id);
+		
+	}
+	printf("----Delete: %d\n", delete(index, 999));
+	if ((ret = search(index, vector, dims, &r)) != 0) {
+		printf("Error en la búsqueda. %d\n", ret);
+		return 1;
+	}
+	printf("----Result: %d\n", r.id);
+	stats(index, &st);
+	print_index_stats(&st);
     printf("Prueba finalizada correctamente.\n");
 	getchar();
     return 0;

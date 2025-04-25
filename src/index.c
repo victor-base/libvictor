@@ -553,11 +553,17 @@ Index *load_index(const char *filename) {
 		goto error_return;
 	}
 
+	if (idx->remap(idx->data, &idx->map) != SUCCESS) {
+		idx->release(&(idx->data));
+		goto error_return;
+	}
+
 	pthread_rwlock_init(&idx->rwlock, NULL);
 
 	return idx;
 
 error_return:
+	perror("Message");
 	free_mem(idx);
 	io_free_vectors(&io);
 	io_free(&io);

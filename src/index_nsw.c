@@ -199,8 +199,8 @@ static void nsw_inode2snode(SNodeNSW *dst, INodeNSW *src, int max_neighbors, IOC
 		"invalid vector reference in node"
 	);
     dst->vector  = iv;
-    dst->odegree = (u_int8_t) src->odegree;
-    dst->alive   = (u_int8_t) src->alive;
+    dst->odegree = (uint8_t) src->odegree;
+    dst->alive   = (uint8_t) src->alive;
     for (i = 0; i < src->odegree; i++) {
         PANIC_IF(
 			map_get_safe(&io->nat, (uint64_t)(uintptr_t) src->neighbors[i], &in) == MAP_KEY_NOT_FOUND, 
@@ -282,6 +282,7 @@ int nsw_dump(void *idx, IOContext *io) {
 	
 	io->nsize = SNODESZ(index->odegree_hl);
 	io->vsize = VECTORSZ(index->dims_aligned);
+	io->hsize = sizeof(SIHdrNSW);
 	io->dims = index->dims;
 	io->dims_aligned = index->dims_aligned;
 	io->elements = index->elements;
@@ -324,7 +325,7 @@ int nsw_dump(void *idx, IOContext *io) {
 	
 	uint64_t gptr;
 	PANIC_IF(
-		map_get_safe(&io->nat, (uint64_t)(uintptr_t) index->lentry, &gptr) == MAP_KEY_NOT_FOUND, 
+		map_get_safe(&io->nat, (uint64_t)(uintptr_t) index->gentry, &gptr) == MAP_KEY_NOT_FOUND, 
 		"invalid gentry reference in map"
 	);
 
@@ -750,8 +751,23 @@ static int nsw_release(void **index) {
 
 static int nsw_delete(void *index, void *ref) {
 	if (!index) return INVALID_INDEX;
-	INodeNSW *ptr = (INodeNSW *) ref;
+	INodeNSW *ptr = (INodeNSW *) ref;	
 	ptr->alive = 0;
+	return SUCCESS;
+}
+
+static int nsw_remap(void *index, Map *map) {
+	IndexNSW *idx = (IndexNSW *)index;
+    INodeNSW *ptr;
+
+	ptr = idx->lentry;
+	
+    while (ptr) {
+        if (ptr->alive && ptr->vector)
+			if (map_insert_p(map, ptr->vector->id, ptr) != MAP_SUCCESS)
+				return SYSTEM_ERROR;
+        ptr = ptr->next;
+    }
 	return SUCCESS;
 }
 
@@ -1016,6 +1032,7 @@ static inline void nsw_functions(Index *idx) {
     idx->insert   = nsw_insert;
 	idx->dump     = nsw_dump;
     idx->delete   = nsw_delete;
+	idx->remap    = nsw_remap;
     idx->release  = nsw_release;
 }
 

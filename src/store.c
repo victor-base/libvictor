@@ -1,3 +1,4 @@
+#include <errno.h>
 #include "store.h"
 #include "vector.h"
 
@@ -120,9 +121,7 @@ int store_dump_file(const char *filename, IOContext *io) {
 		ret = FILEIO_ERROR;
 		goto end;
 	}
-
 	voff = ftell(fp);
-	
 	for (int i = 0; i < (int)io->elements; i++) {
 		if (fwrite(io->vectors[i], io->vsize, 1, fp) != 1) {
 			ret = FILEIO_ERROR;
@@ -178,6 +177,11 @@ int store_load_file(const char *filename, IOContext *io) {
 		return FILEIO_ERROR;
 	}
 
+	if (io_init(io, hdr.elements, hdr.hsize, 0) != SUCCESS) {
+		fclose(fp);
+		return SYSTEM_ERROR;
+	}
+
 	if ((io->itype = magic_to_index(hdr.magic)) == -1) {
 		fclose(fp);
 		return INVALID_FILE;
@@ -187,11 +191,6 @@ int store_load_file(const char *filename, IOContext *io) {
 	io->dims_aligned = hdr.dims_aligned;
 	io->method       = hdr.method;
 	io->elements     = hdr.elements;
-
-	if (io_init(io, hdr.elements, hdr.hsize, 0) != SUCCESS) {
-		fclose(fp);
-		return SYSTEM_ERROR;
-	}
 
 	if (fread(io->header, hdr.hsize, 1, fp) != 1) {
 		fclose(fp);
@@ -236,6 +235,7 @@ int store_load_file(const char *filename, IOContext *io) {
 	return SUCCESS;
 
 error_return:
+	perror("Message");
 	if (fp != NULL) fclose(fp);
 	io_free_vectors(io);
 	io_free(io);
