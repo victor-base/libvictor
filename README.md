@@ -83,6 +83,30 @@ int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *result
 
 ```c
 int stats(Index *index, IndexStats *stats);
+
+/**
+ * Statistics structure for timing measurements.
+ */
+typedef struct {
+    uint64_t count;      // Number of operations
+    double   total;      // Total time in seconds
+    double   last;		 // Last operation time
+    double   min;        // Minimum operation time
+    double   max;        // Maximum operation time
+} TimeStat;
+
+/**
+ * Aggregate statistics for the index.
+ */
+typedef struct {
+    TimeStat insert;     // Insert operations timing
+    TimeStat delete;     // Delete operations timing
+    TimeStat dump;       // Dump to file operation
+    TimeStat search;     // Single search timing
+    TimeStat search_n;   // Multi-search timing
+} IndexStats;
+
+
 int size(Index *index, uint64_t *sz);
 int contains(Index *index, uint64_t id);
 int update_icontext(Index *index, void *icontext);
