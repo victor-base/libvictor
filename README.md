@@ -72,6 +72,13 @@ int delete(Index *index, uint64_t id);
 ```c
 int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result);
 int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *results, int n);
+
+typedef struct {
+    uint64_t  id;                  // ID of the matched vector
+    float32_t distance;      // Distance or similarity score
+} MatchResult;
+
+
 ```
 
 - `search`: Finds the nearest neighbor to a given query vector.
