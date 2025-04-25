@@ -335,10 +335,8 @@ static int flat_release(void **index) {
  */
 int flat_index(Index *idx, int method, uint16_t dims) {
     idx->data = flat_init(method, dims);
-    if (idx->data == NULL) {
-        free_mem(idx);
+    if (idx->data == NULL) 
         return SYSTEM_ERROR;
-    }
     idx->name     = "flat";
     idx->context  = NULL;
     idx->search   = flat_search;

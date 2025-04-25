@@ -32,6 +32,10 @@
 #include "vector.h"
 #include "mem.h"
 
+
+Vector *alloc_vector(uint16_t dims_aligned) {
+	return (Vector *) aligned_calloc_mem(16, VECTORSZ(dims_aligned));
+}
  
 /**
  * Allocates and initializes a new `Vector` structure.
@@ -46,7 +50,7 @@ Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims) {
     uint16_t dims_aligned = ALIGN_DIMS(dims);
     
 
-	vector = (Vector *) aligned_calloc_mem(16,sizeof(Vector) + (dims_aligned * sizeof(float32_t)));
+	vector = alloc_vector(dims_aligned);
     if (vector && src) {
         memcpy(vector->vector, src, dims * sizeof(float32_t));
         vector->id = id;

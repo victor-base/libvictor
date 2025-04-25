@@ -68,7 +68,9 @@ typedef enum {
     INDEX_EMPTY,
     THREAD_ERROR,
     SYSTEM_ERROR,
-	NOT_IMPLEMENTED,
+    FILEIO_ERROR,
+    NOT_IMPLEMENTED,
+    INVALID_FILE,
 } ErrorCode;
 
 /**
@@ -76,7 +78,7 @@ typedef enum {
  */
 #define FLAT_INDEX    0x00  // Sequential flat index (single-threaded)
 #define FLAT_INDEX_MP 0x01  // Flat index with multi-threaded support
-#define NSW_INDEX     0x02  // Navigable Small World graph (planned)
+#define NSW_INDEX     0x02  // Navigable Small World graph
 #define HNSW_INDEX    0x03  // Hierarchical NSW (planned)
 
 /**
@@ -96,7 +98,7 @@ typedef struct {
 typedef struct {
     TimeStat insert;     // Insert operations timing
     TimeStat delete;     // Delete operations timing
-	TimeStat dump;       // Dump to file operation
+    TimeStat dump;       // Dump to file operation
     TimeStat search;     // Single search timing
     TimeStat search_n;   // Multi-search timing
 } IndexStats;

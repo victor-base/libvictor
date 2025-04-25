@@ -6,9 +6,9 @@
 #include "heap.h"
 #include "method.h"
 #include "index.h"
+#include "store.h"
 #include "map.h"
 #include "index_nsw.h"
-#include "store_nsw.h"
 #include "mem.h"
 
 
@@ -18,118 +18,6 @@ typedef struct {
     Map  visited;
     int  k;
 } SearchContext;
-
-#define GRAPH_NODESZ(M) sizeof(INodeNSW) + (sizeof(INodeNSW *) * (M))
-
-/*--------------------------------------------------*
- *    Degree and exploration parameter utilities     *
- *--------------------------------------------------*/
-
-/*
- * Computes the dynamic soft out-degree for a given number of elements.
- */
-static inline int compute_odegree(uint64_t N);
-
-/*
- * Computes the ef_construction parameter for insertions.
- */
-static int compute_ef_construction(uint64_t N, int M);
-
-/*
- * Computes the ef_search parameter for search operations.
- */
-static int compute_ef_search(uint64_t N, int M, int k);
-
-/*
- * Computes the position of the most significant bit in a 64-bit integer.
- */
-static inline int get_msb_index(uint64_t x);
-
-/*--------------------------------------------------*
- *          Index and node initialization           *
- *--------------------------------------------------*/
-
-/*
- * Initializes a new IndexNSW instance.
- */
-static IndexNSW *nsw_init(int method, uint16_t dims, NSWContext *context);
-
-/*
- * Allocates and initializes a new graph node with neighbor capacity.
- */
-INodeNSW *make_inodensw(uint64_t id, float32_t *vector, uint16_t dims, int odegree_max);
-
-/*--------------------------------------------------*
- *             Search context management            *
- *--------------------------------------------------*/
-
-/*
- * Initializes a SearchContext structure.
- */
-static int init_search_context(SearchContext *sc, int ef, int k, int (*cmp)(float32_t, float32_t));
-
-/*
- * Frees memory used by a SearchContext.
- */
-static void destroy_search_context(SearchContext *sc);
-
-/*
- * Trims the heap to retain only top-k candidates.
- */
-static void sc_discard_candidates(SearchContext *sc);
-
-/*--------------------------------------------------*
- *                Core NSW algorithms               *
- *--------------------------------------------------*/
-
-/*
- * Graph search traversal starting from an entry node.
- */
-static int nsw_explore(const INodeNSW *entry, SearchContext *sc, float32_t *v, uint16_t dims_aligned, const CmpMethod *cmp);
-
-/*
- * Performs top-1 nearest neighbor search.
- */
-static int nsw_search(void *index, float32_t *vector, uint16_t dims, MatchResult *result);
-
-/*
- * Performs top-n nearest neighbor search.
- */
-static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResult *result, int n);
-
-/*--------------------------------------------------*
- *                Index operations                  *
- *--------------------------------------------------*/
-
-/*
- * Inserts a new vector into the graph.
- */
-static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims, void **ref);
-
-/*
- * Marks a node as deleted (logical removal).
- */
-static int nsw_delete(void *index, void *ref);
-
-/*
- * Frees the entire NSW index and all its nodes.
- */
-static int nsw_release(void **index);
-
-/*--------------------------------------------------*
- *                  Internal logic                  *
- *--------------------------------------------------*/
-
-/*
- * Selects the index of the worst neighbor (largest distance).
- */
-static int nsw_worst_neighbor(INodeNSW *node, CmpMethod *cmp, uint16_t dims_aligned);
-
-/*
- * Connects two nodes, optionally creating a backlink.
- */
-static int nsw_connect_to(const IndexNSW *const idx, INodeNSW *node, INodeNSW *neighbor, int backlink);
-
 
 /*
 * compute_odegree - Dynamic softlimit lookup for NSW/HNSW graph construction
@@ -282,6 +170,227 @@ static int compute_ef_search(uint64_t N, int M, int k) {
  *                                PRIVATE FUNCTIONS                                    *
  *-------------------------------------------------------------------------------------*/
 
+
+/**
+ * Serializes an in-memory NSW node into its on-disk representation.
+ *
+ * This function transforms an `INodeNSW` structure into a compact `SNodeNSW`
+ * format suitable for persistent storage. It translates internal memory pointers
+ * (`Vector*` and neighbor `INodeNSW*`) into file offsets using the provided maps.
+ * 
+ * The output node is padded with zeroed neighbor slots if the current out-degree
+ * is less than `max_neighbors`, ensuring fixed-size storage on disk.
+ *
+ * @param dst - Pointer to the destination SNodeNSW (on-disk format).
+ * @param src - Pointer to the source in-memory INodeNSW node.
+ * @param max_neighbors - Maximum number of neighbors (allocated slots in `neighbors[]`).
+ * @param io - IO Context struct
+ */
+static void nsw_inode2snode(SNodeNSW *dst, INodeNSW *src, int max_neighbors, IOContext *io) {
+    int i;
+    uint64_t iv;
+	uint64_t in;
+
+	PANIC_IF(src->odegree > max_neighbors, "odegree exceeds max_neighbors");
+
+
+	PANIC_IF(
+		map_get_safe(&io->vat, (uint64_t)(uintptr_t) src->vector, &iv) == MAP_KEY_NOT_FOUND, 
+		"invalid vector reference in node"
+	);
+    dst->vector  = iv;
+    dst->odegree = (u_int8_t) src->odegree;
+    dst->alive   = (u_int8_t) src->alive;
+    for (i = 0; i < src->odegree; i++) {
+        PANIC_IF(
+			map_get_safe(&io->nat, (uint64_t)(uintptr_t) src->neighbors[i], &in) == MAP_KEY_NOT_FOUND, 
+			"invalid neighbor reference in node"
+		);
+        dst->neighbors[i] = in;
+    }
+    for ( ; i < max_neighbors; i++) {
+        dst->neighbors[i] = 0;
+    }
+}
+
+/**
+ * Reconstructs an in-memory NSW node from its serialized (on-disk) representation.
+ *
+ * This function transforms an `SNodeNSW` structure (read from disk) back into
+ * a fully connected `INodeNSW` structure in memory. It uses the `vat` and `nat`
+ * maps to resolve disk offsets back to their corresponding memory pointers.
+ *
+ * The function also increments the `idegree` of each neighbor node referenced,
+ * restoring inbound degree metadata used for graph consistency.
+ *
+ * Neighbor slots beyond the actual out-degree are set to NULL to ensure clean state.
+ *
+ * @param dst - Pointer to the destination in-memory INodeNSW.
+ * @param src - Pointer to the source SNodeNSW loaded from disk.
+ * @param max_neighbors - Maximum number of neighbors (allocated slots in `neighbors[]`).
+ * @param io - IO Context struct
+ */
+static int nsw_snode2inode(INodeNSW *dst, SNodeNSW *src, int max_neighbors, IOContext *io, INodeNSW **inodes) {
+    int i;
+    dst->vector =  src->vector < io->elements ? (Vector *) io->vectors[src->vector] : NULL;
+    if (dst->vector == NULL)
+        return INVALID_FILE;
+    dst->odegree = (int) src->odegree;
+    dst->alive   = (int) src->alive;
+    for ( i = 0; i < src->odegree; i++) {
+        dst->neighbors[i] = src->neighbors[i] < io->elements ? inodes[src->neighbors[i]] : NULL;
+        if (dst->neighbors[i] == NULL)
+            return INVALID_FILE;
+        dst->neighbors[i]->idegree++;
+    }
+    for ( ;i < max_neighbors; i++) {
+        dst->neighbors[i] = NULL;
+    }
+    return SUCCESS;
+}
+
+
+/**
+ * Dumps the entire NSW index to a binary file on disk.
+ *
+ * This function serializes an `IndexNSW` structure into a compact on-disk
+ * representation composed of three sections:
+ * 1. A header (`SIHdrNSW`)
+ * 2. A vector section (contiguous `Vector` entries)
+ * 3. A node section (contiguous `SNodeNSW` entries)
+ *
+ * The dumping process consists de two passes:
+ * - First pass: traverse the graph, write all vectors, and collect pointer-to-offset mappings.
+ * - Second pass: serialize each node using the offset maps and write them sequentially.
+ *
+ * At the end, a compact header is written at the start of the file, containing offsets and metadata
+ * required to reconstruct the graph via `nsw_load()`.
+ *
+ * @param index - Pointer to the in-memory NSW index to serialize.
+ * @param filename - Path to the output file to write the dump.
+ *
+ * @return SUCCESS if the dump was successful, or SYSTEM_ERROR on failure.
+ */
+int nsw_dump(void *idx, IOContext *io) {
+    IndexNSW *index = (IndexNSW *) idx;
+    SNodeNSW *node;
+    INodeNSW *entry;
+	int ret = SUCCESS, i;
+
+	if (io_init(io, index->elements, sizeof(SIHdrNSW), 1) != SUCCESS)
+		return SYSTEM_ERROR;
+	
+	io->nsize = SNODESZ(index->odegree_hl);
+	io->vsize = VECTORSZ(index->dims_aligned);
+	io->dims = index->dims;
+	io->dims_aligned = index->dims_aligned;
+	io->elements = index->elements;
+	io->itype = NSW_INDEX;
+	io->method = index->cmp->type;
+	
+
+    entry = index->lentry;
+    for (i = 0; entry; entry = entry->next, i++) {
+		PANIC_IF(i >= (int) io->elements, "index overflow while mapping entries");
+		if (map_insert(&io->nat, (uintptr_t)entry, i) != MAP_SUCCESS) {
+			ret = SYSTEM_ERROR;
+			goto cleanup;
+		}
+
+		io->vectors[i] = entry->vector;
+		if (map_insert(&io->vat, (uintptr_t)entry->vector, i) != MAP_SUCCESS) {
+			ret = SYSTEM_ERROR;
+			goto cleanup;
+		}
+	}
+
+    entry = index->lentry;    
+	for (i = 0; entry; entry = entry->next, i++) {
+		PANIC_IF(i >= (int) io->elements, "index overflow while mapping entries");
+		node = (SNodeNSW *) calloc_mem(1, io->nsize);
+		if (!node) {
+			ret = SYSTEM_ERROR;
+			goto cleanup;
+		}
+        nsw_inode2snode(node, entry, index->odegree_hl, io);
+        io->nodes[i] = node;
+    }
+
+	((SIHdrNSW *)io->header)->ef_construct = index->ef_construct;
+	((SIHdrNSW *)io->header)->ef_search = index->ef_search;
+	((SIHdrNSW *)io->header)->odegree_computed = index->odegree_computed;
+	((SIHdrNSW *)io->header)->odegree_hl = index->odegree_hl;
+	((SIHdrNSW *)io->header)->odegree_sl = index->odegree_sl;
+	
+	uint64_t gptr;
+	PANIC_IF(
+		map_get_safe(&io->nat, (uint64_t)(uintptr_t) index->lentry, &gptr) == MAP_KEY_NOT_FOUND, 
+		"invalid gentry reference in map"
+	);
+
+	((SIHdrNSW *)io->header)->entry = gptr;
+
+cleanup:
+	if (ret != SUCCESS)
+		io_free(io);
+    return ret;
+}
+
+
+
+IndexNSW *nsw_load(IOContext *io) {
+	IndexNSW *idx = NULL; 
+    INodeNSW **inodes;
+	INodeNSW *entry;
+	SIHdrNSW *hdr = io->header;
+
+	inodes = calloc_mem(io->elements, sizeof(INodeNSW *));
+	if (inodes == NULL)
+		return NULL;
+
+	entry = NULL;
+	for (int i = 0; i < (int) io->elements; i++) {
+		if ((inodes[i] = calloc_mem(1, NSW_NODESZ(hdr->odegree_hl))) == NULL) {
+			while (i && i-- >= 0) {
+				free_mem(inodes[i]);
+				inodes[i] = NULL;
+			}
+			free_mem(inodes);
+			return NULL;
+		}
+		inodes[i]->next = entry;
+		entry = inodes[i];
+	} 
+    
+	for (int i = 0; i < (int)io->elements; i++)
+		if (nsw_snode2inode(inodes[i], io->nodes[i], hdr->odegree_hl, io, inodes) != SUCCESS)
+			goto error;
+
+    idx = (IndexNSW *) calloc_mem(1, sizeof(IndexNSW));
+    if (!idx) 
+		goto error;
+
+	idx->cmp = get_method(io->method);
+	idx->dims = io->dims;
+	idx->dims_aligned = io->dims_aligned;
+	idx->ef_construct = hdr->ef_construct;
+	idx->ef_search = hdr->ef_search;
+	idx->elements  = io->elements;
+	idx->odegree_computed = hdr->odegree_computed;
+	idx->odegree_hl = hdr->odegree_hl;
+	idx->odegree_sl = hdr->odegree_sl;
+	idx->lentry = entry;
+	idx->gentry = inodes[hdr->entry];
+	return idx;
+
+error:
+	for (int i = 0; i < (int)io->elements; i++) {
+		free_mem(inodes[i]);
+		inodes[i] = NULL;
+	}
+	free_mem(inodes);
+	return NULL;
+}
 /**
  * Initializes a new NSW (Navigable Small World) index structure with the given
  * dimensionality and configuration context.
@@ -527,19 +636,6 @@ static int nsw_explore(const INodeNSW *entry, SearchContext *sc, float32_t *v, u
     return SUCCESS;
 }
 
-/**
- * nsw_search - Search for the top closest neighbors in a NSW index.
- *
- * @param index   Pointer to the IndexNSW structure
- * @param vector  Query vector
- * @param dims    Number of dimensions (must match index)
- * @param result  Output array of MatchResult[n], sorted by ascending distance
- *
- * @returns ErrorCode (SUCCESS or failure reason)
- */
-static int nsw_search(void *index, float32_t *vector, uint16_t dims, MatchResult *result) {
-    return nsw_search_n(index, vector, dims, result, 1);
-}
 
 /**
  * Performs a nearest neighbor search over the NSW (Navigable Small World) index,
@@ -611,6 +707,21 @@ static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResu
     return ret;
 }
 
+/**
+ * nsw_search - Search for the top closest neighbors in a NSW index.
+ *
+ * @param index   Pointer to the IndexNSW structure
+ * @param vector  Query vector
+ * @param dims    Number of dimensions (must match index)
+ * @param result  Output array of MatchResult[n], sorted by ascending distance
+ *
+ * @returns ErrorCode (SUCCESS or failure reason)
+ */
+static int nsw_search(void *index, float32_t *vector, uint16_t dims, MatchResult *result) {
+    return nsw_search_n(index, vector, dims, result, 1);
+}
+
+
 /*
  * nsw_release - Releases all resources associated with a flat index.
  *
@@ -643,6 +754,148 @@ static int nsw_delete(void *index, void *ref) {
 	ptr->alive = 0;
 	return SUCCESS;
 }
+
+/**
+ * Allocates and initializes a new INodeNSW structure with space for the specified
+ * maximum number of out-neighbors (`odegree_max`). This function also creates and
+ * assigns the internal vector representation associated with the node.
+ *
+ * The node is allocated with memory sized dynamically based on the neighbor capacity,
+ * using the `NSW_NODESZ(odegree_max)` macro, which is expected to calculate the full
+ * memory footprint needed for a node with `odegree_max` neighbor slots.
+ *
+ * If either the node memory allocation or the vector initialization fails, the function
+ * ensures all resources are properly freed before returning NULL.
+ *
+ * Parameters:
+ *  - id: the unique identifier associated with this node and its vector.
+ *  - vector: pointer to the vector data to be copied or referenced.
+ *  - dims: dimensionality of the vector.
+ *  - odegree_max: maximum number of neighbors the node can hold (capacity).
+ *
+ * Returns:
+ *  - A pointer to a fully initialized INodeNSW instance on success.
+ *  - NULL if memory allocation or vector creation fails.
+ */
+
+INodeNSW *make_inodensw(uint64_t id, float32_t *vector, uint16_t dims, int odegree_max) {
+    INodeNSW *node = (INodeNSW *) calloc_mem(1, NSW_NODESZ(odegree_max));
+
+    if (node == NULL)
+        return NULL;
+
+	node->alive  = 1;
+    node->vector = make_vector(id, vector, dims);
+    if (node->vector == NULL) {
+        free_mem(node);
+        return NULL;
+    }	
+
+    return node;
+}
+
+/**
+ * Finds the index of the worst (least relevant) neighbor currently connected to
+ * the given node, based on the configured distance comparison method.
+ *
+ * This function iterates over the node's active out-neighbors (`odegree`) and
+ * uses the provided comparison method (`cmp`) to determine the least favorable
+ * connection according to the graph's distance metric. The "worst" neighbor is
+ * defined as the one that produces the largest distance value, or equivalently,
+ * the least desirable match (as determined by `cmp->is_better_match()`).
+ *
+ * The function is used in situations where a node's neighbor list is full, and a
+ * new candidate might replace the worst current neighbor if it represents a better match.
+ *
+ * Parameters:
+ *  - node: the node whose neighbors are to be evaluated.
+ *  - cmp: pointer to the distance comparison method (including metric and match rules).
+ *  - dims_aligned: the aligned dimensionality of the vectors, used for comparison.
+ *
+ * Returns:
+ *  - The index (0-based) of the worst neighbor in the `node->neighbors` array.
+ *  - -1 if no valid neighbor is found (e.g., all entries are NULL).
+ */
+
+ static int nsw_worst_neighbor(INodeNSW *node, CmpMethod *cmp, uint16_t dims_aligned) {
+    INodeNSW *cantidate;
+    float32_t distance, wd = cmp->worst_match_value;
+    int wi = -1, i;
+
+    for (i = 0; i < node->odegree; i ++) {
+        cantidate = node->neighbors[i];
+        if (cantidate) {
+            distance = cmp->compare_vectors(
+                node->vector->vector, cantidate->vector->vector, dims_aligned
+            );
+            if (wi == -1 || !cmp->is_better_match(distance, wd)) {
+                wd = distance;
+                wi = i;
+            }
+        }
+    }
+    return wi;
+}
+
+
+/**
+ * Establishes a directed connection from `node` to `neighbor`, and optionally 
+ * performs a backward connection (backlink) from `neighbor` to `node` if the 
+ * `backlink` flag is set.
+ *
+ * If `neighbor` has not yet reached its out-degree limit (`odegree_sl`), the backlink
+ * is added directly. Otherwise, the function checks whether `node` is a better match 
+ * than `neighbor`'s current worst neighbor. If so, and the worst neighbor has an 
+ * in-degree greater than 1 (to avoid isolation), it is replaced with `node`, and 
+ * degree counters are updated accordingly.
+ *
+ * This logic enforces conditional symmetry in the graph without violating per-node 
+ * connection limits, and ensures that no node is disconnected as a result of an 
+ * aggressive replacement.
+ *
+ * Parameters:
+ *  - idx: the index configuration and comparator functions.
+ *  - node: the source node initiating the connection.
+ *  - neighbor: the destination node to be connected to.
+ *  - backlink: if non-zero, attempt to create a reverse connection.
+ *
+ * Returns:
+ *  - SUCCESS if the connection (and backlink, if applicable) was successful.
+ *  - -1 if the backlink could not be established due to structural constraints.
+ */
+
+ static int nsw_connect_to(const IndexNSW *const idx, INodeNSW *node, INodeNSW *neighbor, int backlink) {
+    INodeNSW *worst;
+    float32_t d1, d2;
+    int wi;
+    node->neighbors[node->odegree++] = neighbor;
+    neighbor->idegree++;
+    if (!backlink)
+        return SUCCESS;
+    
+    if (neighbor->odegree < idx->odegree_sl) {
+        neighbor->neighbors[neighbor->odegree++] = node;
+        node->idegree++;
+        return SUCCESS;
+    }
+
+    wi = nsw_worst_neighbor(neighbor, idx->cmp, idx->dims_aligned);
+    if (wi == -1)
+        return -1;
+
+    worst = neighbor->neighbors[wi];
+    d1 = idx->cmp->compare_vectors(neighbor->vector->vector, worst->vector->vector, idx->dims_aligned);
+    d2 = idx->cmp->compare_vectors(node->vector->vector, neighbor->vector->vector, idx->dims_aligned);
+
+    if (idx->cmp->is_better_match(d2, d1) && worst->idegree > 1) {
+        worst->idegree--;
+        node->idegree++;
+        neighbor->neighbors[wi] = node;
+        return SUCCESS;
+    }
+    return -1;
+}   
+
 
 /**
  * Inserts a new vector into the NSW (Navigable Small World) graph index.
@@ -713,8 +966,9 @@ static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims
             PANIC_IF(heap_pop(&sc.W, &candidate) == HEAP_ERROR_EMPTY, "lack of consistency");
             neighbor = (INodeNSW *) HEAP_NODE_PTR(candidate);
             nsw_connect_to(idx, node, neighbor, 1);
-			idx->elements++;
+			
         }
+		idx->elements++;
     } else {
         free_vector(&(node->vector));
         free_mem(node);
@@ -727,145 +981,8 @@ static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims
 
 
 
-/**
- * Allocates and initializes a new INodeNSW structure with space for the specified
- * maximum number of out-neighbors (`odegree_max`). This function also creates and
- * assigns the internal vector representation associated with the node.
- *
- * The node is allocated with memory sized dynamically based on the neighbor capacity,
- * using the `GRAPH_NODESZ(odegree_max)` macro, which is expected to calculate the full
- * memory footprint needed for a node with `odegree_max` neighbor slots.
- *
- * If either the node memory allocation or the vector initialization fails, the function
- * ensures all resources are properly freed before returning NULL.
- *
- * Parameters:
- *  - id: the unique identifier associated with this node and its vector.
- *  - vector: pointer to the vector data to be copied or referenced.
- *  - dims: dimensionality of the vector.
- *  - odegree_max: maximum number of neighbors the node can hold (capacity).
- *
- * Returns:
- *  - A pointer to a fully initialized INodeNSW instance on success.
- *  - NULL if memory allocation or vector creation fails.
- */
 
-INodeNSW *make_inodensw(uint64_t id, float32_t *vector, uint16_t dims, int odegree_max) {
-    INodeNSW *node = (INodeNSW *) calloc_mem(1, GRAPH_NODESZ(odegree_max));
 
-    if (node == NULL)
-        return NULL;
-
-	node->alive  = 1;
-    node->vector = make_vector(id, vector, dims);
-    if (node->vector == NULL) {
-        free_mem(node);
-        return NULL;
-    }	
-
-    return node;
-}
-
-/**
- * Finds the index of the worst (least relevant) neighbor currently connected to
- * the given node, based on the configured distance comparison method.
- *
- * This function iterates over the node's active out-neighbors (`odegree`) and
- * uses the provided comparison method (`cmp`) to determine the least favorable
- * connection according to the graph's distance metric. The "worst" neighbor is
- * defined as the one that produces the largest distance value, or equivalently,
- * the least desirable match (as determined by `cmp->is_better_match()`).
- *
- * The function is used in situations where a node's neighbor list is full, and a
- * new candidate might replace the worst current neighbor if it represents a better match.
- *
- * Parameters:
- *  - node: the node whose neighbors are to be evaluated.
- *  - cmp: pointer to the distance comparison method (including metric and match rules).
- *  - dims_aligned: the aligned dimensionality of the vectors, used for comparison.
- *
- * Returns:
- *  - The index (0-based) of the worst neighbor in the `node->neighbors` array.
- *  - -1 if no valid neighbor is found (e.g., all entries are NULL).
- */
-
-static int nsw_worst_neighbor(INodeNSW *node, CmpMethod *cmp, uint16_t dims_aligned) {
-    INodeNSW *cantidate;
-    float32_t distance, wd = cmp->worst_match_value;
-    int wi = -1, i;
-
-    for (i = 0; i < node->odegree; i ++) {
-        cantidate = node->neighbors[i];
-        if (cantidate) {
-            distance = cmp->compare_vectors(
-                node->vector->vector, cantidate->vector->vector, dims_aligned
-            );
-            if (wi == -1 || !cmp->is_better_match(distance, wd)) {
-                wd = distance;
-                wi = i;
-            }
-        }
-    }
-    return wi;
-}
-
-/**
- * Establishes a directed connection from `node` to `neighbor`, and optionally 
- * performs a backward connection (backlink) from `neighbor` to `node` if the 
- * `backlink` flag is set.
- *
- * If `neighbor` has not yet reached its out-degree limit (`odegree_sl`), the backlink
- * is added directly. Otherwise, the function checks whether `node` is a better match 
- * than `neighbor`'s current worst neighbor. If so, and the worst neighbor has an 
- * in-degree greater than 1 (to avoid isolation), it is replaced with `node`, and 
- * degree counters are updated accordingly.
- *
- * This logic enforces conditional symmetry in the graph without violating per-node 
- * connection limits, and ensures that no node is disconnected as a result of an 
- * aggressive replacement.
- *
- * Parameters:
- *  - idx: the index configuration and comparator functions.
- *  - node: the source node initiating the connection.
- *  - neighbor: the destination node to be connected to.
- *  - backlink: if non-zero, attempt to create a reverse connection.
- *
- * Returns:
- *  - SUCCESS if the connection (and backlink, if applicable) was successful.
- *  - -1 if the backlink could not be established due to structural constraints.
- */
-
-static int nsw_connect_to(const IndexNSW *const idx, INodeNSW *node, INodeNSW *neighbor, int backlink) {
-    INodeNSW *worst;
-    float32_t d1, d2;
-    int wi;
-    node->neighbors[node->odegree++] = neighbor;
-    neighbor->idegree++;
-    if (!backlink)
-        return SUCCESS;
-    
-    if (neighbor->odegree < idx->odegree_sl) {
-        neighbor->neighbors[neighbor->odegree++] = node;
-        node->idegree++;
-        return SUCCESS;
-    }
-
-    wi = nsw_worst_neighbor(neighbor, idx->cmp, idx->dims_aligned);
-    if (wi == -1)
-        return -1;
-
-    worst = neighbor->neighbors[wi];
-    d1 = idx->cmp->compare_vectors(neighbor->vector->vector, worst->vector->vector, idx->dims_aligned);
-    d2 = idx->cmp->compare_vectors(node->vector->vector, neighbor->vector->vector, idx->dims_aligned);
-
-    if (idx->cmp->is_better_match(d2, d1) && worst->idegree > 1) {
-        worst->idegree--;
-        node->idegree++;
-        neighbor->neighbors[wi] = node;
-        return SUCCESS;
-    }
-    return -1;
-}   
 
 /*-------------------------------------------------------------------------------------*
  *                                PUBLIC FUNCTIONS                                     *
@@ -892,20 +1009,32 @@ static int nsw_connect_to(const IndexNSW *const idx, INodeNSW *node, INodeNSW *n
  *  - SUCCESS if the index is successfully initialized.
  *  - SYSTEM_ERROR if memory allocation or NSW setup fails.
  */
-int nsw_index(Index *idx, int method, uint16_t dims, NSWContext *context) {
-    idx->data = nsw_init(method, dims, context);
-    if (idx->data == NULL) {
-        free_mem(idx);
-        return SYSTEM_ERROR;
-    }
-    idx->name     = "nsw";
-    idx->context  = NULL;
-    idx->search   = nsw_search;
+
+static inline void nsw_functions(Index *idx) {
+	idx->search   = nsw_search;
     idx->search_n = nsw_search_n;
     idx->insert   = nsw_insert;
 	idx->dump     = nsw_dump;
     idx->delete   = nsw_delete;
     idx->release  = nsw_release;
+}
 
-    return SUCCESS;
+int nsw_index(Index *idx, int method, uint16_t dims, NSWContext *context) {
+    idx->data = nsw_init(method, dims, context);
+    if (idx->data == NULL) 
+        return SYSTEM_ERROR;
+    idx->name     = "nsw";
+    idx->context  = context;
+    nsw_functions(idx);
+	return SUCCESS;
+}
+
+int nsw_index_load(Index *idx, IOContext *io) {
+	idx->data = nsw_load(io);
+	if (idx->data == NULL) 
+        return SYSTEM_ERROR;
+	idx->name     = "nsw";
+    idx->context  = NULL;
+    nsw_functions(idx);
+	return SUCCESS;
 }

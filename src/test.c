@@ -8,7 +8,7 @@
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
-#define NUM_VECTORS 100000
+#define NUM_VECTORS 1000
 
 // Cantidad de vectores a insertar
 
