@@ -37,26 +37,132 @@ This RC of `libvictor` lays the foundation for a fast, embeddable and flexible v
 
 ---
 
-## 🚀 Public Interface (C API)
+## Public C API – `libvictor`
 
-All functions operate through the abstract `Index` type:
-
-| Function             | Description                                             |
-|----------------------|---------------------------------------------------------|
-| `alloc_index()`      | Allocates a new index in memory                         |
-| `load_index()`       | Loads an index from disk                                |
-| `destroy_index()`    | Frees memory and resources associated with an index     |
-| `insert()`           | Inserts a new vector with its associated ID             |
-| `delete()`           | Deletes a vector by ID                                  |
-| `search()`           | Searches for the top-N closest vectors to a query       |
-| `search_n()`         | Searches with a specific result count                   |
-| `contains()`         | Checks if an ID exists in the index                     |
-| `stats()`            | Returns statistics (nodes, edges, memory, etc.)         |
-| `size()`             | Returns the number of vectors in the index              |
-| `update_context()`   | Updates internal state (used post-optimization)         |
-| `dump()`             | Serializes the full index to disk                       |
+`libvictor` exposes a minimal and high-performance C API for building and interacting with vector indexes such as Flat and NSW. This interface is designed to be embeddable, extensible, and compatible with C/C++ environments and foreign language bindings.
 
 ---
+
+### Index Lifecycle
+
+```c
+Index *alloc_index(int type, int method, uint16_t dims, void *icontext);
+int destroy_index(Index **index);
+```
+
+- `alloc_index`: Allocates and initializes a new index of the specified type (`FLAT_INDEX`, `NSW_INDEX`, etc.) and distance method (`L2NORM`, `COSINE`, `DOTP`).
+- `destroy_index`: Frees all memory and resources associated with the index.
+
+---
+
+### Insertion & Deletion
+
+```c
+int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
+int delete(Index *index, uint64_t id);
+```
+
+- `insert`: Inserts a vector with a unique ID into the index.
+- `delete`: Removes a vector from the index by its ID.
+
+---
+
+### Search Operations
+
+```c
+int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result);
+int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *results, int n);
+```
+
+- `search`: Finds the nearest neighbor to a given query vector.
+- `search_n`: Finds the `n` closest neighbors to the query vector, sorted by distance or similarity.
+
+---
+
+### Index Info & Statistics
+
+```c
+int stats(Index *index, IndexStats *stats);
+int size(Index *index, uint64_t *sz);
+int contains(Index *index, uint64_t id);
+int update_icontext(Index *index, void *icontext);
+```
+
+- `stats`: Retrieves timing statistics for operations like search, insert, and dump.
+- `size`: Returns the number of stored vectors.
+- `contains`: Checks if a vector ID exists in the index.
+- `update_icontext`: Updates the internal configuration/context of an index.
+
+---
+
+### Persistence (Save/Load)
+
+```c
+int dump(Index *index, const char *filename);
+Index *load_index(const char *filename);
+```
+
+- `dump`: Serializes the index to a binary file for persistent storage.
+- `load_index`: Reconstructs an index from a previously saved file.
+
+---
+
+### Comparison Methods
+
+```c
+#define L2NORM 0x00    // Euclidean Distance
+#define COSINE 0x01    // Cosine Similarity
+#define DOTP   0x02    // Dot Product
+```
+
+---
+
+### Index Types
+
+```c
+#define FLAT_INDEX     0x00
+#define FLAT_INDEX_MP  0x01
+#define NSW_INDEX      0x02
+#define HNSW_INDEX     0x03
+```
+
+---
+
+### Versioning
+
+```c
+const char *__LIB_VERSION(void);
+const char *__LIB_SHORT_VERSION(void);
+```
+
+Returns the full and short version strings of the `libvictor` library.
+
+---
+
+### Error Codes
+
+These are returned by most public API functions to indicate success or failure.
+
+| Code Name           | Description                                 |
+|---------------------|---------------------------------------------|
+| `SUCCESS`           | Operation completed successfully            |
+| `INVALID_INIT`      | Invalid initialization state                |
+| `INVALID_INDEX`     | Index pointer is null or invalid            |
+| `INVALID_VECTOR`    | Malformed or null vector                    |
+| `INVALID_RESULT`    | Output/result buffer is invalid             |
+| `INVALID_DIMENSIONS`| Mismatched or out-of-bound dimensions       |
+| `INVALID_ARGUMENT`  | General argument validation failure         |
+| `INVALID_ID`        | Vector ID is invalid or zero                |
+| `INVALID_REF`       | Reference pointer is invalid                |
+| `DUPLICATED_ENTRY`  | Duplicate vector ID already exists          |
+| `NOT_FOUND_ID`      | No entry found for the specified ID         |
+| `INDEX_EMPTY`       | Index is empty and operation is not allowed |
+| `THREAD_ERROR`      | Internal threading or locking issue         |
+| `SYSTEM_ERROR`      | System-level or memory error                |
+| `FILEIO_ERROR`      | File read/write failure                     |
+| `NOT_IMPLEMENTED`   | Function not implemented for this index     |
+| `INVALID_FILE`      | Malformed or corrupted file format          |
+
 
 ## 🧬 Internal Features
 
