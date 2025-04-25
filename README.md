@@ -3,118 +3,105 @@
 This project is licensed under the [GNU Lesser General Public License v3.0](https://www.gnu.org/licenses/lgpl-3.0.html).
 
 
-# libvictor
+# 🧠 libvictor — Release Candidate (RC)
 
-**libvictor** is the core library for managing and operating a vector-based database. It provides efficient algorithms for vector operations, memory management, and modular design, making it suitable for integration into larger projects.
-
----
-
-## Description
-
-`libvictor` is a foundational library for a vector-based database. It provides the essential components required for efficient vector storage, retrieval, and computation. The library is designed to be modular, allowing easy integration into larger systems.
-
-Key features include:
-- **Vector Operations**: Perform various vector computations with optimized algorithms.
-- **Memory Management**: Efficient handling of memory for vector data structures.
-- **Cross-Platform Support**: Compatible with Linux, macOS, and Windows.
+> **Version**: `v0.9.0-rc`  
+> **Date**: April 2025  
+> **Stage**: Release Candidate (First public-ready milestone)  
 
 ---
 
-## How to Compile
+## 🧩 Overview
 
-### Prerequisites
+This RC of `libvictor` lays the foundation for a fast, embeddable and flexible vector search engine written in C. It supports multiple index types and is built with simplicity and speed in mind. This release includes:
 
-- **Compiler**: Ensure you have `gcc` or any compatible C compiler installed.
-- **Make**: Required for building the library using the provided Makefiles.
-
-### Steps to Compile
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/victor-base/libvictor.git
-   cd libvictor
-   ```
-
-2. **Build the library**:
-   - For Linux/macOS:
-     ```bash
-     make
-     ```
-   - For Windows:
-     ```bash
-     make -f src/Makefile.win
-     ```
+- A stable public API
+- Graph-based and flat vector indexing
+- Extensible distance metrics
+- Language bindings for Python, Go, and Java
+- Linux distribution packages (`.deb`, `.tar.gz`)
+- Persistence and restore capabilities
 
 ---
 
-## How to Install
+### ✅ Component Checklist
 
-Currently, the installation process is manual. Follow these steps:
-
-1. **Compile the library** (see "How to Compile").
-2. **Copy the compiled library** to your desired location:
-   - On Linux/macOS:
-     ```bash
-     sudo cp libvictor.a /usr/local/lib/
-     sudo cp -r include/ /usr/local/include/libvictor/
-     ```
-   - On Windows:
-     Copy the compiled `.lib` or `.dll` files to your project directory or a system-wide library path.
-
-> **Note**: An automated installer is under development and will be included in future releases.
+- [x] **Flat Index** — Stable & Functional
+- [x] **Graph Index** — NSW Stable & Functional  
+- [x] **Deletion** — Deferred delete / mark inactive  
+- [ ] **Bindings** — Python / Go / Java — In progress / C# 🚧 
+- [ ] **Persistence** — `dump()` and `load()` — In progress 🚧 
+- [ ] **Benchmarks** — In progress 🚧  
+- [x] **Docs** — Public API complete 📄  
+- [ ] **Package** - Package Distribution 
 
 ---
 
-## How it Works
+## 🚀 Public Interface (C API)
 
-`libvictor` provides a set of APIs for managing vector-based data. Here's a high-level overview of how it works:
+All functions operate through the abstract `Index` type:
 
-1. **Initialization**:
-   - Set up the vector database and configure parameters such as dimensions and indexing methods.
-
-2. **Vector Insertion**:
-   - Insert vectors into the database using efficient memory management.
-
-3. **Vector Search**:
-   - Perform similarity searches (e.g., nearest neighbor) using optimized algorithms.
-
-4. **Customization**:
-   - Extend the library by implementing custom indexing or similarity metrics.
-
-Refer to the source files in the `src/` directory for detailed implementations.
-
----
-
-## How to Uninstall
-
-To remove the library manually:
-
-1. **Delete the compiled files**:
-   - On Linux/macOS:
-     ```bash
-     sudo rm /usr/local/lib/libvictor.a
-     sudo rm -r /usr/local/include/libvictor/
-     ```
-   - On Windows:
-     Delete the `.lib` or `.dll` files from your system.
-
-2. **Clean the build directory**:
-   ```bash
-   make clean
-   ```
+| Function             | Description                                             |
+|----------------------|---------------------------------------------------------|
+| `alloc_index()`      | Allocates a new index in memory                         |
+| `load_index()`       | Loads an index from disk                                |
+| `destroy_index()`    | Frees memory and resources associated with an index     |
+| `insert()`           | Inserts a new vector with its associated ID             |
+| `delete()`           | Deletes a vector by ID                                  |
+| `search()`           | Searches for the top-N closest vectors to a query       |
+| `search_n()`         | Searches with a specific result count                   |
+| `contains()`         | Checks if an ID exists in the index                     |
+| `stats()`            | Returns statistics (nodes, edges, memory, etc.)         |
+| `size()`             | Returns the number of vectors in the index              |
+| `update_context()`   | Updates internal state (used post-optimization)         |
+| `dump()`             | Serializes the full index to disk                       |
 
 ---
 
-## Repository Structure
+## 🧬 Internal Features
 
-This repository contains the core files for the vector database:
+| Feature                  | Description                                                    |
+|--------------------------|----------------------------------------------------------------|
+| Multi-index architecture | Internal framework to support multiple indexing strategies     |
+| Flat index               | Exact vector search                                            |
+| Graph index (NSW)        | Navigable Small World approximation-based index                |
+| Distance metrics         | `dot_product`, `cosine_similarity`, `L2_norm` (Euclidean)      |
 
-- **Makefiles**:
-  - `Makefile`: For building on Linux/macOS.
-  - `Makefile.win`: For building on Windows.
-- **Source Files**: Located in the `src/` directory, including implementations for vector operations, memory management, and indexing.
-- **Configuration Files**: Found in `.vscode/` for development environment setup.
+All index types share a common abstract API, and new types can be registered via plugin.
 
 ---
 
-This repository serves as the foundation for the vector database, providing the essential components required for efficient vector storage and retrieval.
+## 🧪 Language Bindings
+
+This release includes tested bindings for:
+
+- **Python**: via `ctypes`/`cffi`, ready for NumPy arrays
+- **Golang**: via cgo wrappers
+- **Java**: via JNI for Android and server-side integrations
+
+Bindings offer full access to the public interface.
+
+---
+
+## 📦 Distribution Packages
+
+Available build artifacts:
+
+### ✅ Debian Package (`.deb`)
+- Target: Ubuntu 20.04+, Debian Bullseye+
+- Arch: x86_64, ARM64
+- Installs to: `/usr/local/lib/libvictor.so`, headers in `/usr/local/include/victor/`
+
+### ✅ Tarball Source Distribution (`.tar.gz`)
+- Contains:
+  - `src/` (C source files)
+  - `include/`
+  - `Makefile`
+  - `examples/`
+  - `bindings/`
+- Build with: `make all` or `cmake . && make`
+
+To create:
+```bash
+make dist-deb
+make dist-tar
