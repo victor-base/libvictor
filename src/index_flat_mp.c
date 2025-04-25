@@ -526,10 +526,8 @@ static int flat_release_mp(void **index) {
  */
 int flat_index_mp(Index *idx, int method, uint16_t dims) {
     idx->data = flat_mp_init(method, dims);
-    if (idx->data == NULL) {
-        free_mem(idx);
+    if (idx->data == NULL)
         return SYSTEM_ERROR;
-    }
     idx->name     = "flat_mp";
     idx->context  = NULL;
     idx->search   = flat_search_mp;

@@ -26,22 +26,27 @@
  * memory management functions to create and free vectors efficiently.
  */
 
- #ifndef __VECTOR_H
- #define __VECTOR_H 1
- 
- #include "victor.h"
- 
- #define ALIGN_DIMS(d) (((d) + 3) & ~3)
+#ifndef __VECTOR_H
+#define __VECTOR_H 1
+
+#include "victor.h"
+
+#define ALIGN_DIMS(d) (((d) + 3) & ~3)
+
+#define VECTORSZ(__D__) (sizeof(Vector) + (__D__) * sizeof(float32_t))
 
 /**
  * Structure representing a vector with an identifier and a dynamically
  * sized floating-point array.
  */
 typedef struct __attribute__((aligned(16))) {
-	uint64_t id;
-	uint64_t __res;     
-	float32_t vector[];
+    uint64_t id;
+    uint64_t __res;     
+    float32_t vector[];
 } Vector;
+
+
+extern Vector *alloc_vector(uint16_t dims_aligned);
  
 /**
  * Allocates and initializes a new `Vector` structure.

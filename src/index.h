@@ -31,6 +31,7 @@
 #define _INDEX_H
 
 #include "victor.h"
+#include "store.h"
 #include "map.h"
 
 #define __LIB_VERSION_MAJOR "1"
@@ -111,6 +112,8 @@ typedef struct Index {
      */
     int (*insert)(void *, uint64_t, float32_t *, uint16_t, void **ref);
 
+	int (*remap)(void *, Map *);
+
     /**
      * Deletes a vector from the index using its ID.
      * @param data The specific index data structure.
@@ -132,7 +135,7 @@ typedef struct Index {
      * @param filename Path to the file where the index should be dumped.
      * @return 0 if successful, or -1 on error.
      */
-	int (*dump)(void *, const char *);
+	int (*dump)(void *, IOContext *);
 
     /**
      * Releases internal resources allocated by the index (if any).

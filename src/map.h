@@ -46,6 +46,10 @@ typedef struct map_node {
     struct map_node *next;
 } MapNode;
 
+
+_Static_assert(sizeof(uintptr_t) <= sizeof(uint64_t), "Pointers won't fit in uint64_t");
+
+
 /**
  * Structure representing the hash map.
  * Includes configuration for load factor threshold, total map size,
@@ -59,6 +63,7 @@ typedef struct {
     uint64_t elements;            // Total number of elements stored
     MapNode  **map;               // Array of buckets
 } Map;
+
 
 
 /**
@@ -79,6 +84,9 @@ extern int map_has(const Map *map, uint64_t key);
  */
 extern uint64_t map_get(const Map *map, uint64_t key);
 extern void *map_get_p(const Map *map, uint64_t key);
+extern int map_get_safe(const Map *map, uint64_t key, uint64_t *out);
+extern int map_get_safe_p(const Map *map, uint64_t key, void **out);
+
 /**
  * Removes an entry with the given ID from the map.
  *
@@ -88,6 +96,8 @@ extern void *map_get_p(const Map *map, uint64_t key);
  */
 extern uint64_t map_remove(Map *map, uint64_t key);
 extern void *map_remove_p(Map *map, uint64_t key);
+extern int map_remove_safe(Map *map, uint64_t key, uint64_t *out);
+extern int map_remove_safe_p(Map *map, uint64_t key, void **out);
 /**
  * Inserts a new entry into the map.
  * Triggers a rehash if the load factor exceeds the threshold.
@@ -115,6 +125,9 @@ extern int init_map(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold);
  * @param map Pointer to the Map structure to destroy.
  */
 extern void map_destroy(Map *map);
+
+#define MAP_KEY_NOT_FOUND -1
+#define MAP_OK 0
 
 typedef enum {
     MAP_SUCCESS = 0,             // Operación exitosa

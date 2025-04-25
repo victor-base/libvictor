@@ -27,8 +27,6 @@
 
 #include "map.h"
 
-#define LOAD_FACTOR(map) \
-	((map)->mapsize == 0 ? 0 : ((map)->elements) / (map)->mapsize)
 
 /**
  * Computes the bucket index for a given ID using modulo hashing.
@@ -38,14 +36,16 @@ static inline uint32_t map_hash(const Map *map, uint64_t key) {
 	return key % map->mapsize;
 }
 
+static inline int LOAD_FACTOR(const Map *map) {
+	return map->mapsize == 0 ? 0 : map->elements / map->mapsize;
+}
+
 /**
  * Checks whether an entry with the given key exists in the map.
  */
 int map_has(const Map *map, uint64_t key) {
 	int i = map_hash(map, key);
 	MapNode *ptr;
-
-	PANIC_IF(map == NULL, "map null in map_has");
 
 	ptr = map->map[i];
 	while (ptr) {
@@ -60,52 +60,79 @@ int map_has(const Map *map, uint64_t key) {
  * Checks whether an entry with the given key exists in the map and retun ref pointer.
  */
 uint64_t map_get(const Map *map, uint64_t key) {
-	int i = map_hash(map, key);
-	MapNode *ptr;
-
-	PANIC_IF(map == NULL, "map null in map_has");
-
-	ptr = map->map[i];
-	while (ptr) {
-		if (ptr->key == key)
-			return ptr->value;
-		ptr = ptr->next;
-	}
-	return 0;
+    uint64_t value;
+    return map_get_safe(map, key, &value) == MAP_OK ? value : 0;
 }
+
 
 void *map_get_p(const Map *map, uint64_t key) {
-	return (void *)(uintptr_t) map_get(map, key);
+    void *ptr;
+    return map_get_safe_p(map, key, &ptr) == MAP_OK ? ptr : NULL;
 }
+
+int map_get_safe(const Map *map, uint64_t key, uint64_t *out) {
+    int i = map_hash(map, key);
+    MapNode *ptr = map->map[i];
+
+    while (ptr) {
+        if (ptr->key == key) {
+            *out = ptr->value;
+            return MAP_OK;
+        }
+        ptr = ptr->next;
+    }
+
+    return MAP_KEY_NOT_FOUND;
+}
+
+int map_get_safe_p(const Map *map, uint64_t key, void **out) {
+    uint64_t value;
+    int result = map_get_safe(map, key, &value);
+    if (result != MAP_OK) return result;
+    *out = (void *)(uintptr_t) value;
+    return MAP_OK;
+}
+
+int map_remove_safe(Map *map, uint64_t key, uint64_t *out) {
+    int i = map_hash(map, key);
+    MapNode **pp = &map->map[i];
+    MapNode *node;
+
+    while ((node = *pp)) {
+        if (node->key == key) {
+            *pp = node->next;
+            *out = node->value;
+            free_mem(node);
+            map->elements--;
+            return MAP_OK;
+        }
+        pp = &node->next;
+    }
+
+    return MAP_KEY_NOT_FOUND;
+}
+
+int map_remove_safe_p(Map *map, uint64_t key, void **out) {
+    uint64_t value;
+    int result = map_remove_safe(map, key, &value);
+    if (result != MAP_OK) return result;
+    *out = (void *)(uintptr_t) value;
+    return MAP_OK;
+}
+
 
 /**
  * Removes and returns the reference associated with the given key.
  */
 uint64_t map_remove(Map *map, uint64_t key) {
-	PANIC_IF(map == NULL, "map null in map_remove");
-
-	int i = map_hash(map, key);
-	MapNode **pp = &map->map[i];
-	MapNode *node;
-
-	while ((node = *pp)) {
-		if (node->key == key) {
-			*pp = node->next;
-			uint64_t value = node->value;
-			free_mem(node);
-			map->elements--;
-			return value;
-		}
-		pp = &node->next;
-	}
-
-	return 0;
+    uint64_t value;
+    return map_remove_safe(map, key, &value) == MAP_OK ? value : 0;
 }
 
 void *map_remove_p(Map *map, uint64_t key) {
-	return (void *)(uintptr_t) map_remove(map, key);
+    void *ptr;
+    return map_remove_safe_p(map, key, &ptr) == MAP_OK ? ptr : NULL;
 }
-
 /**
  * Internal function that resizes the hash map and re-distributes entries.
  */

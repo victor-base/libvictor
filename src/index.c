@@ -410,6 +410,8 @@ int contains(Index *index, uint64_t id) {
  */
 int dump(Index *index, const char *filename) {
 	double start, end, delta;
+	IOContext io;
+	
 	int ret;
 	if (!index)
 		return INVALID_INDEX;
@@ -419,14 +421,17 @@ int dump(Index *index, const char *filename) {
 
 	pthread_rwlock_rdlock(&index->rwlock);
 	start = get_time_ms_monotonic();
-
-	ret = index->dump(index->data, filename);
-	end = get_time_ms_monotonic();
-    if (ret == SUCCESS) {
-        delta = end - start;
-        UPDATE_TIMESTAT(index->stats.dump, delta);
-    }
+	ret = index->dump(index->data, &io);
+	if (ret == SUCCESS) {
+		ret = store_dump_file(filename, &io);
+		if (ret == SUCCESS) {
+			end = get_time_ms_monotonic();
+			delta = end - start;
+        	UPDATE_TIMESTAT(index->stats.dump, delta);
+		}
+	}
 	pthread_rwlock_unlock(&index->rwlock);
+	io_free(&io);
 	return ret;
 }
 
@@ -488,50 +493,79 @@ Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
     if (idx == NULL) 
         return NULL;
 
-    ret = init_map(&idx->map, 10000, 15);
-    if (ret != SUCCESS) {
-        free_mem(idx);
-        return NULL;
-    }
+	switch (type){
+	case FLAT_INDEX:
+		ret = flat_index(idx, method, dims);
+		break;
+	case FLAT_INDEX_MP:
+		ret = flat_index_mp(idx, method, dims);
+		break;
+	case NSW_INDEX:
+		ret = nsw_index(idx, method, dims, icontext);
+		break;
+	default:
+		ret = INVALID_INDEX;
+		break;
+	}
 
-    pthread_rwlock_init(&idx->rwlock, NULL);
-    switch (type) {
-        case FLAT_INDEX:
-            if (flat_index(idx, method, dims) != SUCCESS) {
-                free_mem(idx);
-                return NULL;
-            }
-            break;
-        
-        case FLAT_INDEX_MP:
-            if (flat_index_mp(idx, method, dims) != SUCCESS) {
-                free_mem(idx);
-                return NULL;
-            }
-            break;
+	if (ret != SUCCESS || (init_map(&idx->map, 10000, 15) != SUCCESS))
+		goto error_return;
 
-        case NSW_INDEX:
-            if (nsw_index(idx, method, dims, icontext) != SUCCESS) {
-                free_mem(idx);
-                return NULL;
-            }
-            break;
+	pthread_rwlock_init(&idx->rwlock, NULL);
 
-        /*
-        Future index types can be added here
-        
-        case HNSW_INDEX:
-            if (hnsw_index(idx, method, dims) != SUCCESS) {
-                free_mem(idx);
-                return NULL;
-            }
-            break;
-        */
-        default:
-            free_mem(idx);
-            return NULL;
-    }
-    return idx;
+	return idx;
+
+error_return:
+	if (idx && idx->data != NULL)
+		idx->release(&(idx->data));
+	map_destroy(&idx->map);
+	free_mem(idx);
+	return NULL;
 }
 
+Index *load_index(const char *filename) {
+	Index *idx = NULL; 
+	IOContext io;
+	int ret;
 
+	if ((idx = calloc_mem(1, sizeof(Index))) == NULL)
+		return NULL;
+
+	ret = store_load_file(filename, &io);
+	if (ret != SUCCESS) { 
+		free_mem(idx);
+		return NULL;
+	}
+
+	switch (io.itype) {
+		case NSW_INDEX:
+			ret = nsw_index_load(idx, &io);
+			break;
+		default:
+			ret = INVALID_INDEX;
+			break;
+	}
+	if (ret != SUCCESS)
+		goto error_return;
+	
+	if (init_map(&idx->map, 10000, 15) != SUCCESS) {
+		idx->release(&(idx->data));
+		goto error_return;
+	}
+
+	if (idx->remap(idx->data, &idx->map) != SUCCESS) {
+		idx->release(&(idx->data));
+		goto error_return;
+	}
+
+	pthread_rwlock_init(&idx->rwlock, NULL);
+
+	return idx;
+
+error_return:
+	perror("Message");
+	free_mem(idx);
+	io_free_vectors(&io);
+	io_free(&io);
+	return NULL;
+}
