@@ -508,7 +508,7 @@ Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
 		break;
 	}
 
-	if (ret != SUCCESS || (init_map(&idx->map, 10000, 15) != SUCCESS))
+	if (ret != SUCCESS || (init_map(&idx->map, 100000, 15) != SUCCESS))
 		goto error_return;
 
 	pthread_rwlock_init(&idx->rwlock, NULL);
@@ -548,7 +548,7 @@ Index *load_index(const char *filename) {
 	if (ret != SUCCESS)
 		goto error_return;
 	
-	if (init_map(&idx->map, 10000, 15) != SUCCESS) {
+	if (init_map(&idx->map, io.elements/10, 15) != SUCCESS) {
 		idx->release(&(idx->data));
 		goto error_return;
 	}
@@ -563,7 +563,6 @@ Index *load_index(const char *filename) {
 	return idx;
 
 error_return:
-	perror("Message");
 	free_mem(idx);
 	io_free_vectors(&io);
 	io_free(&io);

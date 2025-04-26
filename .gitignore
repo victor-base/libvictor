@@ -3,3 +3,5 @@
 .idea/*
 *.idx
 *.macos
+src/libvictor.dylib
+src/test_ld.c
