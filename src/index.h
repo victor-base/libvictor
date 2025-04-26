@@ -112,7 +112,7 @@ typedef struct Index {
      */
     int (*insert)(void *, uint64_t, float32_t *, uint16_t, void **ref);
 
-	int (*remap)(void *, Map *);
+    int (*remap)(void *, Map *);
 
     /**
      * Deletes a vector from the index using its ID.
@@ -122,7 +122,7 @@ typedef struct Index {
      */
     int (*delete)(void *, void *);
 
-	/**
+    /**
      * Serializes the current state of the index and writes it to disk.
      *
      * This function creates a persistent on-disk representation of the index,
@@ -135,7 +135,7 @@ typedef struct Index {
      * @param filename Path to the file where the index should be dumped.
      * @return 0 if successful, or -1 on error.
      */
-	int (*dump)(void *, IOContext *);
+    int (*dump)(void *, IOContext *);
 
     /**
      * Releases internal resources allocated by the index (if any).

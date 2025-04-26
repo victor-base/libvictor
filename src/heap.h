@@ -42,12 +42,12 @@
 
 typedef struct {
 
-	union {
-		uint64_t u;
-		int64_t  s;
-		int      i;
-		void    *p;
-	} value;
+    union {
+        uint64_t u;
+        int64_t  s;
+        int      i;
+        void    *p;
+    } value;
 
     float32_t distance;
 } HeapNode;

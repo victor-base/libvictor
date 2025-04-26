@@ -61,9 +61,9 @@ int magic_to_index(uint32_t magic) {
  * @param io Pointer to the IOContext containing vectors to free.
  */
 void io_free_vectors(IOContext *io) {
-	for (int i = 0; i < (int)io->elements; i++) 
-		if (io->vectors[i])
-			free_vector(&io->vectors[i]);
+    for (int i = 0; i < (int)io->elements; i++) 
+        if (io->vectors[i])
+            free_vector(&io->vectors[i]);
 }
 
 /**
@@ -79,44 +79,44 @@ void io_free_vectors(IOContext *io) {
  * @return 0 on success, or an error code on failure.
  */
 int io_init(IOContext *io, int elements, int hdrsz, int maps) {
-	PANIC_IF(io == NULL, "invalid load context");
+    PANIC_IF(io == NULL, "invalid load context");
 
-	io->header  = NULL;
-	io->nodes   = NULL;
-	io->vectors = NULL;
-	io->elements = elements;
-	io->itype = -1;
-	io->hsize = io->vsize = io->nsize = 0;
+    io->header  = NULL;
+    io->nodes   = NULL;
+    io->vectors = NULL;
+    io->elements = elements;
+    io->itype = -1;
+    io->hsize = io->vsize = io->nsize = 0;
 
-	io->header = calloc_mem(1, hdrsz);
-	if (!io->header) return SYSTEM_ERROR;
-	if ((io->vectors = calloc_mem(elements, sizeof(Vector *))) == NULL) {
-		free_mem(io->header);
-		return SYSTEM_ERROR;
-	}
+    io->header = calloc_mem(1, hdrsz);
+    if (!io->header) return SYSTEM_ERROR;
+    if ((io->vectors = calloc_mem(elements, sizeof(Vector *))) == NULL) {
+        free_mem(io->header);
+        return SYSTEM_ERROR;
+    }
 
-	if ((io->nodes = calloc_mem(elements, sizeof(void *))) == NULL) {
-		free_mem(io->header);
-		free_mem(io->vectors);
-		return SYSTEM_ERROR;
-	}
+    if ((io->nodes = calloc_mem(elements, sizeof(void *))) == NULL) {
+        free_mem(io->header);
+        free_mem(io->vectors);
+        return SYSTEM_ERROR;
+    }
 
-	if (maps) {
-		if (init_map(&io->vat, elements/10, 15) == MAP_ERROR_ALLOC) {
-			free_mem(io->header);
-			free_mem(io->vectors);
-			return SYSTEM_ERROR;
-		}
+    if (maps) {
+        if (init_map(&io->vat, elements/10, 15) == MAP_ERROR_ALLOC) {
+            free_mem(io->header);
+            free_mem(io->vectors);
+            return SYSTEM_ERROR;
+        }
 
-		if (init_map(&io->nat, elements/10, 15) == MAP_ERROR_ALLOC) {
-			map_destroy(&io->vat);
-			free_mem(io->header);
-			free_mem(io->vectors);
-			return SYSTEM_ERROR;
-		}
-	}
+        if (init_map(&io->nat, elements/10, 15) == MAP_ERROR_ALLOC) {
+            map_destroy(&io->vat);
+            free_mem(io->header);
+            free_mem(io->vectors);
+            return SYSTEM_ERROR;
+        }
+    }
 
-	return SUCCESS;
+    return SUCCESS;
 }
 
 /**
@@ -128,24 +128,24 @@ int io_init(IOContext *io, int elements, int hdrsz, int maps) {
  * @param io Pointer to the IOContext to free.
  */
 void io_free(IOContext *io) {
-	PANIC_IF(io == NULL, "invalid load context");
-	if (io->header)  free_mem(io->header);
-	if (io->vectors) free_mem(io->vectors);
-	if (io->nodes) {
-		int elements = io->elements;
-		for (int i = 0; i < elements; i++) {
-			if (io->nodes[i]) {
-				free_mem(io->nodes[i]);
-				io->nodes[i] = NULL;
-			}
-		}  
-		free_mem(io->nodes);
-	}
-	if (io->maps) {
-		map_destroy(&io->vat);
-		map_destroy(&io->vat);
-	}
-	memset(io, 0, sizeof(IOContext));
+    PANIC_IF(io == NULL, "invalid load context");
+    if (io->header)  free_mem(io->header);
+    if (io->vectors) free_mem(io->vectors);
+    if (io->nodes) {
+        int elements = io->elements;
+        for (int i = 0; i < elements; i++) {
+            if (io->nodes[i]) {
+                free_mem(io->nodes[i]);
+                io->nodes[i] = NULL;
+            }
+        }  
+        free_mem(io->nodes);
+    }
+    if (io->maps) {
+        map_destroy(&io->vat);
+        map_destroy(&io->vat);
+    }
+    memset(io, 0, sizeof(IOContext));
 }
 
 /**
@@ -160,69 +160,69 @@ void io_free(IOContext *io) {
  * @return 0 on success, or an error code on failure.
  */
 int store_dump_file(const char *filename, IOContext *io) {
-	IOFile *fp = NULL;
-	StoreHDR hdr;
-	uint64_t voff;
-	uint64_t noff;
-	int ret = SUCCESS;
+    IOFile *fp = NULL;
+    StoreHDR hdr;
+    uint64_t voff;
+    uint64_t noff;
+    int ret = SUCCESS;
 
-	PANIC_IF(filename == NULL, "invalid filename pointer");
-	PANIC_IF(io == NULL, "invalid io context");
-	PANIC_IF(io->header == NULL, "header could not be null");
-	PANIC_IF(io->nodes == NULL, "nodes could not be null");
-	PANIC_IF(io->vectors == NULL, "vectors could not be null");
+    PANIC_IF(filename == NULL, "invalid filename pointer");
+    PANIC_IF(io == NULL, "invalid io context");
+    PANIC_IF(io->header == NULL, "header could not be null");
+    PANIC_IF(io->nodes == NULL, "nodes could not be null");
+    PANIC_IF(io->vectors == NULL, "vectors could not be null");
 
-	PANIC_IF(index_to_magic(io->itype) == 0, "invalid index type");
+    PANIC_IF(index_to_magic(io->itype) == 0, "invalid index type");
 
-	if ((fp = file_open(filename, "wb")) == NULL)
-		return FILEIO_ERROR;
+    if ((fp = file_open(filename, "wb")) == NULL)
+        return FILEIO_ERROR;
 
-	if (file_seek(fp, sizeof(StoreHDR), SEEK_SET) != 0) {
-		ret = FILEIO_ERROR;
-		goto end;
-	}
+    if (file_seek(fp, sizeof(StoreHDR), SEEK_SET) != 0) {
+        ret = FILEIO_ERROR;
+        goto end;
+    }
 
-	if (file_write(io->header, io->hsize, 1, fp) != 1) {
-		ret = FILEIO_ERROR;
-		goto end;
-	}
-	voff = (uint64_t)file_tello(fp);
-	for (int i = 0; i < (int)io->elements; i++) {
-		if (file_write(io->vectors[i], io->vsize, 1, fp) != 1) {
-			ret = FILEIO_ERROR;
-			goto end;
-		}
-	}
+    if (file_write(io->header, io->hsize, 1, fp) != 1) {
+        ret = FILEIO_ERROR;
+        goto end;
+    }
+    voff = (uint64_t)file_tello(fp);
+    for (int i = 0; i < (int)io->elements; i++) {
+        if (file_write(io->vectors[i], io->vsize, 1, fp) != 1) {
+            ret = FILEIO_ERROR;
+            goto end;
+        }
+    }
 
-	noff = (uint64_t) file_tello(fp);
-	for (int i = 0; i < (int) io->elements; i++) {
-		if (file_write(io->nodes[i], io->nsize, 1, fp) != 1) {
-			ret = FILEIO_ERROR;
-			goto end;
-		}
-	}
-	hdr.magic = index_to_magic(io->itype);
-	hdr.hsize = io->hsize;
-	hdr.nsize = io->nsize;
-	hdr.vsize = io->vsize;
-	hdr.noff = noff;
-	hdr.voff = voff;
-	hdr.elements = io->elements;
-	hdr.method = io->method;
-	hdr.dims = io->dims;
-	hdr.dims_aligned = io->dims_aligned;
-	
-	if (file_seek(fp, 0, SEEK_SET) != 0) {
-		ret = FILEIO_ERROR;
-		goto end;
-	}
+    noff = (uint64_t) file_tello(fp);
+    for (int i = 0; i < (int) io->elements; i++) {
+        if (file_write(io->nodes[i], io->nsize, 1, fp) != 1) {
+            ret = FILEIO_ERROR;
+            goto end;
+        }
+    }
+    hdr.magic = index_to_magic(io->itype);
+    hdr.hsize = io->hsize;
+    hdr.nsize = io->nsize;
+    hdr.vsize = io->vsize;
+    hdr.noff = noff;
+    hdr.voff = voff;
+    hdr.elements = io->elements;
+    hdr.method = io->method;
+    hdr.dims = io->dims;
+    hdr.dims_aligned = io->dims_aligned;
+    
+    if (file_seek(fp, 0, SEEK_SET) != 0) {
+        ret = FILEIO_ERROR;
+        goto end;
+    }
 
-	if (file_write(&hdr, sizeof(StoreHDR), 1, fp) != 1)
-		ret = FILEIO_ERROR;
+    if (file_write(&hdr, sizeof(StoreHDR), 1, fp) != 1)
+        ret = FILEIO_ERROR;
 
 end:
-	file_close(fp);
-	return ret;
+    file_close(fp);
+    return ret;
 }
 
 /**
@@ -236,83 +236,83 @@ end:
  * @return 0 on success, or an error code on failure.
  */
 int store_load_file(const char *filename, IOContext *io) {
-	IOFile *fp = NULL;
-	off_t pos;
-	StoreHDR hdr;
-	int ret = SUCCESS;
+    IOFile *fp = NULL;
+    off_t pos;
+    StoreHDR hdr;
+    int ret = SUCCESS;
 
-	memset(&hdr, 0, sizeof(StoreHDR));
+    memset(&hdr, 0, sizeof(StoreHDR));
 
 
-	if ((fp = file_open(filename, "rb")) == NULL)
-		return FILEIO_ERROR;
+    if ((fp = file_open(filename, "rb")) == NULL)
+        return FILEIO_ERROR;
 
-	if (file_read(&hdr, sizeof(StoreHDR), 1, fp) != 1) {
-		file_close(fp);
-		return FILEIO_ERROR;
-	}
+    if (file_read(&hdr, sizeof(StoreHDR), 1, fp) != 1) {
+        file_close(fp);
+        return FILEIO_ERROR;
+    }
 
-	if (io_init(io, hdr.elements, hdr.hsize, 0) != SUCCESS) {
-		file_close(fp);
-		return SYSTEM_ERROR;
-	}
+    if (io_init(io, hdr.elements, hdr.hsize, 0) != SUCCESS) {
+        file_close(fp);
+        return SYSTEM_ERROR;
+    }
 
-	if ((io->itype = magic_to_index(hdr.magic)) == -1) {
-		file_close(fp);
-		return INVALID_FILE;
-	}
+    if ((io->itype = magic_to_index(hdr.magic)) == -1) {
+        file_close(fp);
+        return INVALID_FILE;
+    }
 
-	io->dims         = hdr.dims;
-	io->dims_aligned = hdr.dims_aligned;
-	io->method       = hdr.method;
-	io->elements     = hdr.elements;
+    io->dims         = hdr.dims;
+    io->dims_aligned = hdr.dims_aligned;
+    io->method       = hdr.method;
+    io->elements     = hdr.elements;
 
-	if (file_read(io->header, hdr.hsize, 1, fp) != 1) {
-		file_close(fp);
-		return FILEIO_ERROR;
-	}
+    if (file_read(io->header, hdr.hsize, 1, fp) != 1) {
+        file_close(fp);
+        return FILEIO_ERROR;
+    }
 
-	if ((pos = file_tello(fp)) != (off_t)-1 && (uint64_t) pos != hdr.voff) {
-		ret = INVALID_FILE;
-		goto error_return;
-	}
+    if ((pos = file_tello(fp)) != (off_t)-1 && (uint64_t) pos != hdr.voff) {
+        ret = INVALID_FILE;
+        goto error_return;
+    }
 
-	for (int i = 0; i < (int) hdr.elements; i++ ) {
-		io->vectors[i] = alloc_vector(hdr.dims_aligned);
-		if (io->vectors[i] == NULL) {
-			ret = SYSTEM_ERROR;
-			goto error_return;
-		}
-		if (file_read(io->vectors[i], hdr.vsize, 1, fp) != 1) {
-			ret = FILEIO_ERROR;
-			goto error_return;
-		}
-	}
+    for (int i = 0; i < (int) hdr.elements; i++ ) {
+        io->vectors[i] = alloc_vector(hdr.dims_aligned);
+        if (io->vectors[i] == NULL) {
+            ret = SYSTEM_ERROR;
+            goto error_return;
+        }
+        if (file_read(io->vectors[i], hdr.vsize, 1, fp) != 1) {
+            ret = FILEIO_ERROR;
+            goto error_return;
+        }
+    }
 
-	if ((pos = file_tello(fp)) != (off_t)-1 && (uint64_t) pos != hdr.noff) {
-		ret = INVALID_FILE;
-		goto error_return;
-	}
+    if ((pos = file_tello(fp)) != (off_t)-1 && (uint64_t) pos != hdr.noff) {
+        ret = INVALID_FILE;
+        goto error_return;
+    }
 
-	for (int i = 0; i < (int) hdr.elements; i++ ) {
-		io->nodes[i] = calloc_mem(1, hdr.nsize);
-		if (io->nodes[i] == NULL) {
-			ret = SYSTEM_ERROR;
-			goto error_return;
-		}
-		if (file_read(io->nodes[i], hdr.nsize, 1, fp) != 1) {
-			ret = FILEIO_ERROR;
-			goto error_return;
-		}
-	}
+    for (int i = 0; i < (int) hdr.elements; i++ ) {
+        io->nodes[i] = calloc_mem(1, hdr.nsize);
+        if (io->nodes[i] == NULL) {
+            ret = SYSTEM_ERROR;
+            goto error_return;
+        }
+        if (file_read(io->nodes[i], hdr.nsize, 1, fp) != 1) {
+            ret = FILEIO_ERROR;
+            goto error_return;
+        }
+    }
 
-	file_close(fp);
-	return SUCCESS;
+    file_close(fp);
+    return SUCCESS;
 
 error_return:
-	if (fp != NULL) file_close(fp);
-	io_free_vectors(io);
-	io_free(io);
-	return ret;
+    if (fp != NULL) file_close(fp);
+    io_free_vectors(io);
+    io_free(io);
+    return ret;
 }
 

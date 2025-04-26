@@ -9,7 +9,7 @@
 extern int magic_to_index(uint32_t magic);
 
 int main(int argc, char *argv[]) {
-	printf("%s\n", __LIB_VERSION());
+    printf("%s\n", __LIB_VERSION());
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
         return EXIT_FAILURE;
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     if (index_type == NSW_INDEX) {
         SIHdrNSW nsw_hdr;
 
-		printf("\nIndex Specific Header (NSW):\n");
+        printf("\nIndex Specific Header (NSW):\n");
         if (fread(&nsw_hdr, sizeof(SIHdrNSW), 1, fp) != 1) {
             perror("Failed to read SIHdrNSW");
             fclose(fp);

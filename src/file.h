@@ -36,9 +36,9 @@
  */
 typedef struct IOFile {
 #if defined(_WIN32)
-	FILE *fp; /**< FILE pointer for Windows platforms. */
+    FILE *fp; /**< FILE pointer for Windows platforms. */
 #else
-	int fd;   /**< File descriptor for Unix-like platforms. */
+    int fd;   /**< File descriptor for Unix-like platforms. */
 #endif
 } IOFile;
 
