@@ -534,7 +534,7 @@ int flat_index_mp(Index *idx, int method, uint16_t dims) {
     idx->context  = NULL;
     idx->search   = flat_search_mp;
     idx->search_n = flat_search_n_mp;
-	idx->dump     = NULL;
+    idx->dump     = NULL;
     idx->insert   = flat_insert_mp;
     idx->delete   = flat_delete_mp;
     idx->release  = flat_release_mp;

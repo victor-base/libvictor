@@ -56,7 +56,7 @@ typedef struct node_nsw {
 typedef struct {
     int ef_search;
     int ef_construct;
-	int odegree_computed;
+    int odegree_computed;
     int odegree_hl;
     int odegree_sl;
 
@@ -86,7 +86,7 @@ typedef struct {
     uint16_t odegree_sl;        /**< Soft limit for out-degree (used during insert). */
     uint8_t  odegree_computed;
     uint8_t  res[7];            /**< Reserved for future use (padding). */
-	uint64_t entry;             /**< Offset of the entry node (first search entrypoint). */
+    uint64_t entry;             /**< Offset of the entry node (first search entrypoint). */
 } SIHdrNSW;
 
 /**

@@ -32,13 +32,13 @@
  * @return Pointer to IOFile on success, NULL on failure.
  */
 IOFile *file_open(const char *path, const char *mode) {
-	FILE *fp = fopen(path, mode);
-	if (!fp) return NULL;
+    FILE *fp = fopen(path, mode);
+    if (!fp) return NULL;
 
-	IOFile *f = calloc_mem(1, sizeof(IOFile));
-	if (!f) return NULL;
-	f->fp = fp;
-	return f;
+    IOFile *f = calloc_mem(1, sizeof(IOFile));
+    if (!f) return NULL;
+    f->fp = fp;
+    return f;
 }
 
 /**
@@ -51,7 +51,7 @@ IOFile *file_open(const char *path, const char *mode) {
  * @return Number of elements successfully read.
  */
 size_t file_read(void *ptr, size_t size, size_t count, IOFile *f) {
-	return fread(ptr, size, count, f->fp);
+    return fread(ptr, size, count, f->fp);
 }
 
 /**
@@ -64,7 +64,7 @@ size_t file_read(void *ptr, size_t size, size_t count, IOFile *f) {
  * @return Number of elements successfully written.
  */
 size_t file_write(const void *ptr, size_t size, size_t count, IOFile *f) {
-	return fwrite(ptr, size, count, f->fp);
+    return fwrite(ptr, size, count, f->fp);
 }
 
 /**
@@ -76,7 +76,7 @@ size_t file_write(const void *ptr, size_t size, size_t count, IOFile *f) {
  * @return 0 on success, -1 on failure.
  */
 int file_seek(IOFile *f, long offset, int whence) {
-	return fseek(f->fp, offset, whence);
+    return fseek(f->fp, offset, whence);
 }
 
 /**
@@ -86,7 +86,7 @@ int file_seek(IOFile *f, long offset, int whence) {
  * @return Current offset, or (off_t)-1 on failure.
  */
 off_t file_tello(IOFile *f) {
-	return ftello(f->fp);
+    return ftello(f->fp);
 }
 
 /**
@@ -95,9 +95,9 @@ off_t file_tello(IOFile *f) {
  * @param f File handle to close.
  */
 void file_close(IOFile *f) {
-	if (!f) return;
-	fclose(f->fp);
-	free_mem(f);
+    if (!f) return;
+    fclose(f->fp);
+    free_mem(f);
 }
 
 #else
@@ -110,18 +110,18 @@ void file_close(IOFile *f) {
  * @return Pointer to IOFile on success, NULL on failure.
  */
 IOFile *file_open(const char *path, const char *mode) {
-	int flags = 0;
-	if (strcmp(mode, "rb") == 0) flags = O_RDONLY;
-	else if (strcmp(mode, "wb") == 0) flags = O_WRONLY | O_CREAT | O_TRUNC;
-	else return NULL;
+    int flags = 0;
+    if (strcmp(mode, "rb") == 0) flags = O_RDONLY;
+    else if (strcmp(mode, "wb") == 0) flags = O_WRONLY | O_CREAT | O_TRUNC;
+    else return NULL;
 
-	int fd = open(path, flags, 0644);
-	if (fd < 0) return NULL;
+    int fd = open(path, flags, 0644);
+    if (fd < 0) return NULL;
 
-	IOFile *f = calloc_mem(1, sizeof(IOFile));
-	if (!f) return NULL;
-	f->fd = fd;
-	return f;
+    IOFile *f = calloc_mem(1, sizeof(IOFile));
+    if (!f) return NULL;
+    f->fd = fd;
+    return f;
 }
 
 /**
@@ -134,7 +134,7 @@ IOFile *file_open(const char *path, const char *mode) {
  * @return Number of elements successfully read.
  */
 size_t file_read(void *ptr, size_t size, size_t count, IOFile *f) {
-	return read(f->fd, ptr, size * count) / size;
+    return read(f->fd, ptr, size * count) / size;
 }
 
 /**
@@ -147,7 +147,7 @@ size_t file_read(void *ptr, size_t size, size_t count, IOFile *f) {
  * @return Number of elements successfully written.
  */
 size_t file_write(const void *ptr, size_t size, size_t count, IOFile *f) {
-	return write(f->fd, ptr, size * count) / size;
+    return write(f->fd, ptr, size * count) / size;
 }
 
 /**
@@ -159,7 +159,7 @@ size_t file_write(const void *ptr, size_t size, size_t count, IOFile *f) {
  * @return 0 on success, -1 on failure.
  */
 int file_seek(IOFile *f, long offset, int whence) {
-	return lseek(f->fd, offset, whence) == -1 ? -1 : 0;
+    return lseek(f->fd, offset, whence) == -1 ? -1 : 0;
 }
 
 /**
@@ -169,7 +169,7 @@ int file_seek(IOFile *f, long offset, int whence) {
  * @return Current offset, or (off_t)-1 on failure.
  */
 off_t file_tello(IOFile *f) {
-	return lseek(f->fd, 0, SEEK_CUR);
+    return lseek(f->fd, 0, SEEK_CUR);
 }
 
 /**
@@ -178,9 +178,9 @@ off_t file_tello(IOFile *f) {
  * @param f File handle to close.
  */
 void file_close(IOFile *f) {
-	if (!f) return;
-	close(f->fd);
-	free_mem(f);
+    if (!f) return;
+    close(f->fd);
+    free_mem(f);
 }
 
 #endif

@@ -40,41 +40,41 @@
  * @brief Header structure stored at the beginning of the dump file.
  */
 typedef struct {
-	uint32_t magic;         /**< File format identifier. */
-	uint8_t  major;         /**< Major version. */
-	uint8_t  minor;         /**< Minor version. */
-	uint8_t  patch;         /**< Patch version. */
-	uint8_t  hsize;         /**< Size of header structure in bytes. */
-	uint32_t elements;      /**< Number of elements stored. */
-	uint16_t method;        /**< Index method used. */
-	uint16_t dims;          /**< Original vector dimensions. */
-	uint16_t dims_aligned;  /**< Aligned vector dimensions. */
-	uint16_t vsize;         /**< Size in bytes of a vector. */
-	uint16_t nsize;         /**< Size in bytes of a node. */
-	uint64_t voff;          /**< Offset to vectors section. */
-	uint64_t noff;          /**< Offset to nodes section. */
+    uint32_t magic;         /**< File format identifier. */
+    uint8_t  major;         /**< Major version. */
+    uint8_t  minor;         /**< Minor version. */
+    uint8_t  patch;         /**< Patch version. */
+    uint8_t  hsize;         /**< Size of header structure in bytes. */
+    uint32_t elements;      /**< Number of elements stored. */
+    uint16_t method;        /**< Index method used. */
+    uint16_t dims;          /**< Original vector dimensions. */
+    uint16_t dims_aligned;  /**< Aligned vector dimensions. */
+    uint16_t vsize;         /**< Size in bytes of a vector. */
+    uint16_t nsize;         /**< Size in bytes of a node. */
+    uint64_t voff;          /**< Offset to vectors section. */
+    uint64_t noff;          /**< Offset to nodes section. */
 } StoreHDR;
 /**
  * @brief I/O context used for loading or dumping index structures.
  */
 typedef struct {
-	int      itype;          /**< Index type. */
-	uint16_t dims;           /**< Original vector dimensions. */
-	uint16_t dims_aligned;   /**< Aligned vector dimensions. */
-	uint16_t method;         /**< Indexing method. */
-	uint32_t elements;       /**< Number of elements. */
+    int      itype;          /**< Index type. */
+    uint16_t dims;           /**< Original vector dimensions. */
+    uint16_t dims_aligned;   /**< Aligned vector dimensions. */
+    uint16_t method;         /**< Indexing method. */
+    uint32_t elements;       /**< Number of elements. */
 
-	uint16_t hsize;          /**< Size of header structure. */
-	uint16_t nsize;          /**< Size of each node. */
-	uint16_t vsize;          /**< Size of each vector. */
+    uint16_t hsize;          /**< Size of header structure. */
+    uint16_t nsize;          /**< Size of each node. */
+    uint16_t vsize;          /**< Size of each vector. */
 
-	int maps;                /**< Whether to initialize maps. */
-	Map vat;                 /**< Map for vectors. */
-	Map nat;                 /**< Map for nodes. */
+    int maps;                /**< Whether to initialize maps. */
+    Map vat;                 /**< Map for vectors. */
+    Map nat;                 /**< Map for nodes. */
 
-	void   *header;          /**< Pointer to header data. */
-	void   **nodes;          /**< Pointer array to nodes. */
-	Vector **vectors;        /**< Pointer array to vectors. */
+    void   *header;          /**< Pointer to header data. */
+    void   **nodes;          /**< Pointer array to nodes. */
+    Vector **vectors;        /**< Pointer array to vectors. */
 } IOContext;
 
 /**

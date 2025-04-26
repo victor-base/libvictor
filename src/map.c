@@ -32,28 +32,28 @@
  * Computes the bucket index for a given ID using modulo hashing.
  */
 static inline uint32_t map_hash(const Map *map, uint64_t key) {
-	PANIC_IF(map == NULL, "map null in map_hash");
-	return key % map->mapsize;
+    PANIC_IF(map == NULL, "map null in map_hash");
+    return key % map->mapsize;
 }
 
 static inline int LOAD_FACTOR(const Map *map) {
-	return map->mapsize == 0 ? 0 : map->elements / map->mapsize;
+    return map->mapsize == 0 ? 0 : map->elements / map->mapsize;
 }
 
 /**
  * Checks whether an entry with the given key exists in the map.
  */
 int map_has(const Map *map, uint64_t key) {
-	int i = map_hash(map, key);
-	MapNode *ptr;
+    int i = map_hash(map, key);
+    MapNode *ptr;
 
-	ptr = map->map[i];
-	while (ptr) {
-		if (ptr->key == key)
-			return 1;
-		ptr = ptr->next;
-	}
-	return 0;
+    ptr = map->map[i];
+    while (ptr) {
+        if (ptr->key == key)
+            return 1;
+        ptr = ptr->next;
+    }
+    return 0;
 }
 
 /**
@@ -137,103 +137,103 @@ void *map_remove_p(Map *map, uint64_t key) {
  * Internal function that resizes the hash map and re-distributes entries.
  */
 static int map_rehash(Map *map, uint32_t new_mapsize) {
-	MapNode *next, *curr;
-	uint32_t j;
+    MapNode *next, *curr;
+    uint32_t j;
 
-	PANIC_IF(map == NULL, "map is null in rehash");
+    PANIC_IF(map == NULL, "map is null in rehash");
 
-	MapNode **new_map = (MapNode **) calloc_mem(new_mapsize, sizeof(MapNode*));
-	if (new_map == NULL)
-		return MAP_ERROR_ALLOC;
+    MapNode **new_map = (MapNode **) calloc_mem(new_mapsize, sizeof(MapNode*));
+    if (new_map == NULL)
+        return MAP_ERROR_ALLOC;
 
-	for (uint32_t i = 0; i < map->mapsize; ++i) {
-		curr = map->map[i];
-		while (curr) {
-			next = curr->next;
-			j = curr->key % new_mapsize;
-			curr->next = new_map[j];
-			new_map[j] = curr;
-			curr = next;
-		}
-	}
+    for (uint32_t i = 0; i < map->mapsize; ++i) {
+        curr = map->map[i];
+        while (curr) {
+            next = curr->next;
+            j = curr->key % new_mapsize;
+            curr->next = new_map[j];
+            new_map[j] = curr;
+            curr = next;
+        }
+    }
 
-	free_mem(map->map);
-	map->map = new_map;
-	map->mapsize = new_mapsize;
+    free_mem(map->map);
+    map->map = new_map;
+    map->mapsize = new_mapsize;
 
-	return MAP_SUCCESS;
+    return MAP_SUCCESS;
 }
 
 /**
  * Inserts a new entry into the map, with automatic rehashing if needed.
  */
 int map_insert(Map *map, uint64_t key, uint64_t value) {
-	PANIC_IF(map == NULL, "map null in map_insert");
-	PANIC_IF(map->mapsize == 0, "map has invalid mapsize in insert");
+    PANIC_IF(map == NULL, "map null in map_insert");
+    PANIC_IF(map->mapsize == 0, "map has invalid mapsize in insert");
 
-	if (LOAD_FACTOR(map) > map->lfactor_thrhold) {
-		uint32_t new_size = map->mapsize * 2;
-		if (map_rehash(map, new_size) != MAP_SUCCESS)
-			return MAP_ERROR_ALLOC;
-	}
+    if (LOAD_FACTOR(map) > map->lfactor_thrhold) {
+        uint32_t new_size = map->mapsize * 2;
+        if (map_rehash(map, new_size) != MAP_SUCCESS)
+            return MAP_ERROR_ALLOC;
+    }
 
-	int i = map_hash(map, key);
+    int i = map_hash(map, key);
 
-	MapNode *node = (MapNode *) calloc_mem(1, sizeof(MapNode));
-	if (!node)
-		return MAP_ERROR_ALLOC;
+    MapNode *node = (MapNode *) calloc_mem(1, sizeof(MapNode));
+    if (!node)
+        return MAP_ERROR_ALLOC;
 
-	node->key = key;
-	node->value = value;
-	node->next = map->map[i];
-	map->map[i] = node;
+    node->key = key;
+    node->value = value;
+    node->next = map->map[i];
+    map->map[i] = node;
 
-	map->elements++;
+    map->elements++;
 
-	return MAP_SUCCESS;
+    return MAP_SUCCESS;
 }
 
 int map_insert_p(Map *map, uint64_t key, void* value) {
-	return map_insert(map, key, (uint64_t)(uintptr_t) value);
+    return map_insert(map, key, (uint64_t)(uintptr_t) value);
 }
 
 /**
  * Initializes the map with a specified size and load factor threshold.
  */
 int init_map(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold) {
-	if (!map || initial_size == 0)
-		return INVALID_INIT;
+    if (!map || initial_size == 0)
+        return INVALID_INIT;
 
-	map->map = (MapNode **) calloc_mem(initial_size, sizeof(MapNode*));
-	if (!map->map)
-		return MAP_ERROR_ALLOC;
+    map->map = (MapNode **) calloc_mem(initial_size, sizeof(MapNode*));
+    if (!map->map)
+        return MAP_ERROR_ALLOC;
 
-	map->mapsize = initial_size;
-	map->lfactor = 0;
-	map->lfactor_thrhold = lfactor_thrhold;
-	map->elements = 0;
+    map->mapsize = initial_size;
+    map->lfactor = 0;
+    map->lfactor_thrhold = lfactor_thrhold;
+    map->elements = 0;
 
-	return MAP_SUCCESS;
+    return MAP_SUCCESS;
 }
 
 /**
  * Destroys the map and frees all memory associated with it.
  */
 void map_destroy(Map *map) {
-	if (!map || !map->map)
-		return;
+    if (!map || !map->map)
+        return;
 
-	for (uint32_t i = 0; i < map->mapsize; ++i) {
-		MapNode *node = map->map[i];
-		while (node) {
-			MapNode *next = node->next;
-			free_mem(node);
-			node = next;
-		}
-	}
+    for (uint32_t i = 0; i < map->mapsize; ++i) {
+        MapNode *node = map->map[i];
+        while (node) {
+            MapNode *next = node->next;
+            free_mem(node);
+            node = next;
+        }
+    }
 
-	free_mem(map->map);
-	map->map = NULL;
-	map->elements = 0;
-	map->mapsize = 0;
+    free_mem(map->map);
+    map->map = NULL;
+    map->elements = 0;
+    map->mapsize = 0;
 }
