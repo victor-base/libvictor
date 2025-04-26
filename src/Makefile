@@ -7,11 +7,13 @@ OS := $(shell uname -s 2>/dev/null || echo Windows_NT)
 
 ifeq ($(OS), Linux)
     TARGET = testdb
+	DUTIL  = dutil
     LIBNAME = libvictor.so
     CC = gcc
     CFLAGS = -g -Wall -Wextra -O3 -march=native -fPIC
 else ifeq ($(OS), Darwin)
 	TARGET = testdb.macos
+	DUTIL  = dutil
 	LIBNAME = libvictor.dylib
 	CC = gcc  
 	CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
@@ -24,7 +26,11 @@ OBJS = $(SRCS:.c=.o)
 
 LDFLAGS = -lm -lpthread
 
-all: $(TARGET) $(LIBNAME)
+all: $(TARGET) $(LIBNAME) $(DUTIL)
+
+$(DUTIL): $(OBJS)
+	$(CC) $(FLAGS) $(OBJS) -o $(DUTIL) $(LDFLAGS)
+
 
 $(TARGET): $(OBJS) # Me genera el ejecutable (testdb.exe en Win) usando esta regla:
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LDFLAGS)
@@ -37,7 +43,7 @@ $(LIBNAME): $(OBJS) # Creará la biblioteca compartida (libvictor.dll en Windows
 
 # Borro los archivos generados como los .obj y todos los generados en las variables
 clean:
-	rm -f $(OBJS) $(TARGET) $(LIBNAME) 
+	rm -f $(OBJS) $(TARGET) $(LIBNAME) $(DUTIL)
 
 install:
 	cp libvictor.dylib /usr/local/lib/

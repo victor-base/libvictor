@@ -26,16 +26,16 @@
 /**
  * @brief Converts an index type to its corresponding magic number.
  *
- * @param method Index type identifier.
+ * @param itype Index type identifier.
  * @return Corresponding magic number, or 0 if invalid.
  */
-static uint32_t index_to_magic(int method) {
-    switch (method) {
+static uint32_t index_to_magic(int itype) {
+    switch (itype) {
         case FLAT_INDEX:     return FLT_MAGIC;
         case FLAT_INDEX_MP:  return FLT_MP_MAGIC;
         case NSW_INDEX:      return NSW_MAGIC;
         case HNSW_INDEX:     return HNSW_MAGIC;
-        default:             return 0;  // inválido
+        default:             PANIC_IF(1==1, "invalid index type");
     }
 }
 
@@ -45,7 +45,7 @@ static uint32_t index_to_magic(int method) {
  * @param magic Magic number identifier.
  * @return Corresponding index type, or -1 if unknown.
  */
-static int magic_to_index(uint32_t magic) {
+int magic_to_index(uint32_t magic) {
     switch (magic) {
         case FLT_MAGIC:      return FLAT_INDEX;
         case FLT_MP_MAGIC:   return FLAT_INDEX_MP;

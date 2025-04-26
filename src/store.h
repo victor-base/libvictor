@@ -54,7 +54,6 @@ typedef struct {
 	uint64_t voff;          /**< Offset to vectors section. */
 	uint64_t noff;          /**< Offset to nodes section. */
 } StoreHDR;
-
 /**
  * @brief I/O context used for loading or dumping index structures.
  */
