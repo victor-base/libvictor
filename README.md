@@ -152,7 +152,6 @@ Index *load_index(const char *filename);
 
 ```c
 #define FLAT_INDEX     0x00
-#define FLAT_INDEX_MP  0x01
 #define NSW_INDEX      0x02
 #define HNSW_INDEX     0x03
 ```
