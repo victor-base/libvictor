@@ -21,7 +21,7 @@ endif
 
 # Source files & .obj instructiosm
 
-SRCS = index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c index_nsw.c store.c file.c
+SRCS = index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c index_nsw.c store.c file.c asort.c
 OBJS = $(SRCS:.c=.o)
 
 LDFLAGS = -lm -lpthread
