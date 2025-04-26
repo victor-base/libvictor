@@ -66,7 +66,7 @@
  */
 CmpMethod *get_method(int method) {
 unsigned long m = (unsigned long) method;
-    if (m < 0 || m >= NUM_METHODS)
+    if (method < 0 || m >= NUM_METHODS)
         return NULL;
     return &__methods[m];
 }

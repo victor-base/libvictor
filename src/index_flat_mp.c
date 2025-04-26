@@ -155,7 +155,7 @@ static IndexFlatMp *flat_mp_init(int method, uint16_t dims) {
 static int flat_delete_mp(void *index, void *ref) {
     IndexFlatMp *ptr  = (IndexFlatMp *) index;
     INodeFlat   *node = (INodeFlat *) ref;
-    int ret;
+    int ret = NOT_FOUND_ID;
     int i;
 
     for (i = 0; i < ptr->threads; i++) {
@@ -164,6 +164,8 @@ static int flat_delete_mp(void *index, void *ref) {
             break;
         }
     }
+
+    PANIC_IF(ret == NOT_FOUND_ID, "impossible condition");
 
     return ret;
 }
