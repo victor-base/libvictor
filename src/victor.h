@@ -77,7 +77,6 @@ typedef enum {
  * Constants for index types.
  */
 #define FLAT_INDEX    0x00  // Sequential flat index (single-threaded)
-#define FLAT_INDEX_MP 0x01  // Flat index with multi-threaded support
 #define NSW_INDEX     0x02  // Navigable Small World graph
 #define HNSW_INDEX    0x03  // Hierarchical NSW (planned)
 

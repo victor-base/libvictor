@@ -32,13 +32,14 @@ int main(int argc, char *argv[]) {
     printf("Header Information:\n");
     printf("  magic:          0x%08X\n", hdr.magic);
     printf("  version:        %u.%u.%u\n", hdr.major, hdr.minor, hdr.patch);
-    printf("  hsize:          %u bytes\n", hdr.hsize);
     printf("  elements:       %u\n", hdr.elements);
     printf("  method:         %u\n", hdr.method);
     printf("  dims:           %u\n", hdr.dims);
     printf("  dims_aligned:   %u\n", hdr.dims_aligned);
+    printf("  hsize:          %u bytes\n", hdr.hsize);
     printf("  vsize:          %u bytes\n", hdr.vsize);
     printf("  nsize:          %u bytes\n", hdr.nsize);
+    printf("  only_vectors:   %u\n", hdr.only_vectors);
     printf("  voff:           %lu\n", (unsigned long)hdr.voff);
     printf("  noff:           %lu\n", (unsigned long)hdr.noff);
 

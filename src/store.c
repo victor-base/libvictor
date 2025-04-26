@@ -32,7 +32,6 @@
 static uint32_t index_to_magic(int itype) {
     switch (itype) {
         case FLAT_INDEX:     return FLT_MAGIC;
-        case FLAT_INDEX_MP:  return FLT_MP_MAGIC;
         case NSW_INDEX:      return NSW_MAGIC;
         case HNSW_INDEX:     return HNSW_MAGIC;
         default:             PANIC_IF(1==1, "invalid index type");
@@ -48,7 +47,6 @@ static uint32_t index_to_magic(int itype) {
 int magic_to_index(uint32_t magic) {
     switch (magic) {
         case FLT_MAGIC:      return FLAT_INDEX;
-        case FLT_MP_MAGIC:   return FLAT_INDEX_MP;
         case NSW_MAGIC:      return NSW_INDEX;
         case HNSW_MAGIC:     return HNSW_INDEX;
         default:             return -1;  // desconocido
@@ -66,58 +64,6 @@ void io_free_vectors(IOContext *io) {
             free_vector(&io->vectors[i]);
 }
 
-/**
- * @brief Initializes an IOContext structure.
- *
- * Allocates memory for header, vectors, and nodes arrays.
- * Optionally initializes vector and node maps if requested.
- *
- * @param io Pointer to the IOContext to initialize.
- * @param elements Number of elements to allocate.
- * @param hdrsz Size of the header in bytes.
- * @param maps Non-zero to initialize maps, zero to skip.
- * @return 0 on success, or an error code on failure.
- */
-int io_init(IOContext *io, int elements, int hdrsz, int maps) {
-    PANIC_IF(io == NULL, "invalid load context");
-
-    io->header  = NULL;
-    io->nodes   = NULL;
-    io->vectors = NULL;
-    io->elements = elements;
-    io->itype = -1;
-    io->hsize = io->vsize = io->nsize = 0;
-
-    io->header = calloc_mem(1, hdrsz);
-    if (!io->header) return SYSTEM_ERROR;
-    if ((io->vectors = calloc_mem(elements, sizeof(Vector *))) == NULL) {
-        free_mem(io->header);
-        return SYSTEM_ERROR;
-    }
-
-    if ((io->nodes = calloc_mem(elements, sizeof(void *))) == NULL) {
-        free_mem(io->header);
-        free_mem(io->vectors);
-        return SYSTEM_ERROR;
-    }
-
-    if (maps) {
-        if (init_map(&io->vat, elements/10, 15) == MAP_ERROR_ALLOC) {
-            free_mem(io->header);
-            free_mem(io->vectors);
-            return SYSTEM_ERROR;
-        }
-
-        if (init_map(&io->nat, elements/10, 15) == MAP_ERROR_ALLOC) {
-            map_destroy(&io->vat);
-            free_mem(io->header);
-            free_mem(io->vectors);
-            return SYSTEM_ERROR;
-        }
-    }
-
-    return SUCCESS;
-}
 
 /**
  * @brief Frees all memory associated with an IOContext structure.
@@ -141,12 +87,66 @@ void io_free(IOContext *io) {
         }  
         free_mem(io->nodes);
     }
-    if (io->maps) {
-        map_destroy(&io->vat);
-        map_destroy(&io->vat);
-    }
+
+    map_destroy(&io->vat);
+    map_destroy(&io->nat);
+
     memset(io, 0, sizeof(IOContext));
 }
+
+/**
+ * @brief Initializes an IOContext structure.
+ *
+ * Allocates memory for header, vectors, and nodes arrays.
+ * Optionally initializes vector and node maps if requested.
+ *
+ * @param io Pointer to the IOContext to initialize.
+ * @param elements Number of elements to allocate.
+ * @param hdrsz Size of the header in bytes.
+ * @param maps Non-zero to initialize maps, zero to skip.
+ * @return 0 on success, or an error code on failure.
+ */
+int io_init(IOContext *io, int elements, int hdrsz, int mode) {
+    PANIC_IF(io == NULL, "invalid load context");
+    PANIC_IF(hdrsz == 0 && (mode & IO_INIT_HEADER)  , "invalid header size");
+
+    io->header  = NULL;
+    io->nodes   = NULL;
+    io->vectors = NULL;
+    io->elements = elements;
+    io->itype = -1;
+    io->hsize = hdrsz;
+    io->vsize = io->nsize = 0;
+    io->nat = MAP_INIT();
+    io->vat = MAP_INIT();
+
+    if (mode & IO_INIT_HEADER)
+        if ((io->header = calloc_mem(1, hdrsz)) == NULL)
+            goto error_return;
+            
+    if (mode & IO_INIT_VECTORS)
+        if ((io->vectors = calloc_mem(elements, sizeof(Vector *))) == NULL) 
+            goto error_return;
+            
+    if (mode & IO_INIT_NODES)
+        if ((io->nodes = calloc_mem(elements, sizeof(void *))) == NULL)
+            goto error_return;
+
+
+    if (mode & (IO_INIT_VECTORS | IO_INIT_MAPS))
+        if (init_map(&io->vat, elements/10, 15) == MAP_ERROR_ALLOC)
+            goto error_return;
+
+    if (mode & (IO_INIT_NODES | IO_INIT_MAPS))
+        if (init_map(&io->nat, elements/10, 15) == MAP_ERROR_ALLOC) 
+            goto error_return;
+
+    return SUCCESS;
+error_return:
+    io_free(io);
+    return SYSTEM_ERROR;
+}
+
 
 /**
  * @brief Dumps an IOContext to a binary file.
@@ -168,8 +168,6 @@ int store_dump_file(const char *filename, IOContext *io) {
 
     PANIC_IF(filename == NULL, "invalid filename pointer");
     PANIC_IF(io == NULL, "invalid io context");
-    PANIC_IF(io->header == NULL, "header could not be null");
-    PANIC_IF(io->nodes == NULL, "nodes could not be null");
     PANIC_IF(io->vectors == NULL, "vectors could not be null");
 
     PANIC_IF(index_to_magic(io->itype) == 0, "invalid index type");
@@ -182,10 +180,12 @@ int store_dump_file(const char *filename, IOContext *io) {
         goto end;
     }
 
-    if (file_write(io->header, io->hsize, 1, fp) != 1) {
-        ret = FILEIO_ERROR;
-        goto end;
-    }
+    if (io->hsize > 0)
+        if (file_write(io->header, io->hsize, 1, fp) != 1) {
+            ret = FILEIO_ERROR;
+            goto end;
+        }
+
     voff = (uint64_t)file_tello(fp);
     for (int i = 0; i < (int)io->elements; i++) {
         if (file_write(io->vectors[i], io->vsize, 1, fp) != 1) {
@@ -194,12 +194,17 @@ int store_dump_file(const char *filename, IOContext *io) {
         }
     }
 
-    noff = (uint64_t) file_tello(fp);
-    for (int i = 0; i < (int) io->elements; i++) {
-        if (file_write(io->nodes[i], io->nsize, 1, fp) != 1) {
-            ret = FILEIO_ERROR;
-            goto end;
+    if (io->nodes != NULL) {
+        noff = (uint64_t) file_tello(fp);
+        for (int i = 0; i < (int) io->elements; i++) {
+            if (file_write(io->nodes[i], io->nsize, 1, fp) != 1) {
+                ret = FILEIO_ERROR;
+                goto end;
+            }
         }
+    } else {
+        hdr.only_vectors = 1;
+        noff = 0;
     }
     hdr.magic = index_to_magic(io->itype);
     hdr.hsize = io->hsize;
@@ -240,6 +245,7 @@ int store_load_file(const char *filename, IOContext *io) {
     off_t pos;
     StoreHDR hdr;
     int ret = SUCCESS;
+    int mode = 0;
 
     memset(&hdr, 0, sizeof(StoreHDR));
 
@@ -252,14 +258,22 @@ int store_load_file(const char *filename, IOContext *io) {
         return FILEIO_ERROR;
     }
 
-    if (io_init(io, hdr.elements, hdr.hsize, 0) != SUCCESS) {
-        file_close(fp);
-        return SYSTEM_ERROR;
-    }
-
     if ((io->itype = magic_to_index(hdr.magic)) == -1) {
         file_close(fp);
         return INVALID_FILE;
+    }
+
+    if (hdr.hsize != 0)
+        mode = IO_INIT_HEADER;
+
+    if (hdr.only_vectors)
+        mode |= IO_INIT_VECTORS;
+    else 
+        mode |= IO_INIT_NODES | IO_INIT_VECTORS;
+
+    if (io_init(io, hdr.elements, hdr.hsize, mode) != SUCCESS) {
+        file_close(fp);
+        return SYSTEM_ERROR;
     }
 
     io->dims         = hdr.dims;

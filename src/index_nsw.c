@@ -277,12 +277,11 @@ int nsw_dump(void *idx, IOContext *io) {
     INodeNSW *entry;
     int ret = SUCCESS, i;
 
-    if (io_init(io, index->elements, sizeof(SIHdrNSW), 1) != SUCCESS)
+    if (io_init(io, index->elements, sizeof(SIHdrNSW), IO_INIT_HEADER | IO_INIT_MAPS | IO_INIT_NODES | IO_INIT_VECTORS) != SUCCESS)
         return SYSTEM_ERROR;
     
     io->nsize = SNODESZ(index->odegree_hl);
     io->vsize = VECTORSZ(index->dims_aligned);
-    io->hsize = sizeof(SIHdrNSW);
     io->dims = index->dims;
     io->dims_aligned = index->dims_aligned;
     io->elements = index->elements;
@@ -339,7 +338,7 @@ cleanup:
 
 
 
-IndexNSW *nsw_load(IOContext *io) {
+static IndexNSW *nsw_load(IOContext *io) {
     IndexNSW *idx = NULL; 
     INodeNSW **inodes;
     INodeNSW *entry;
@@ -469,6 +468,8 @@ static IndexNSW *nsw_init(int method, uint16_t dims, NSWContext *context) {
 static int init_search_context(SearchContext *sc, int ef, int k, int (*cmp)(float32_t, float32_t)) {
     PANIC_IF(ef < 0, "invalid parameter ef");
     PANIC_IF(k < 0, "invalid parameter k");
+
+    sc->visited = MAP_INIT();
     if (init_heap(&sc->W, HEAP_MIN, ef, cmp) != HEAP_SUCCESS)
         return SYSTEM_ERROR;
     if (init_heap(&sc->C, HEAP_MAX, NOLIMIT_HEAP, cmp) != HEAP_SUCCESS) {

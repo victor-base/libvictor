@@ -48,7 +48,6 @@
 #include "map.h"
 #include "time.h"
 #include "index_flat.h"
-#include "index_flat_mp.h"
 #include "index_nsw.h"
 
 
@@ -493,12 +492,11 @@ Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
     if (idx == NULL) 
         return NULL;
 
+    idx->map = MAP_INIT();
+
     switch (type){
     case FLAT_INDEX:
         ret = flat_index(idx, method, dims);
-        break;
-    case FLAT_INDEX_MP:
-        ret = flat_index_mp(idx, method, dims);
         break;
     case NSW_INDEX:
         ret = nsw_index(idx, method, dims, icontext);
@@ -531,6 +529,8 @@ Index *load_index(const char *filename) {
     if ((idx = calloc_mem(1, sizeof(Index))) == NULL)
         return NULL;
 
+    idx->map = MAP_INIT();
+
     ret = store_load_file(filename, &io);
     if (ret != SUCCESS) { 
         free_mem(idx);
@@ -542,7 +542,7 @@ Index *load_index(const char *filename) {
             ret = nsw_index_load(idx, &io);
             break;
         default:
-            ret = INVALID_INDEX;
+            ret = NOT_IMPLEMENTED;
             break;
     }
     if (ret != SUCCESS)
@@ -563,6 +563,7 @@ Index *load_index(const char *filename) {
     return idx;
 
 error_return:
+    map_destroy(&idx->map);
     free_mem(idx);
     io_free_vectors(&io);
     io_free(&io);

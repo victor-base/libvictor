@@ -21,7 +21,7 @@ endif
 
 # Source files & .obj instructiosm
 
-SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c heap.c time.c map.c index_nsw.c store.c file.c
+SRCS = index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c index_nsw.c store.c file.c
 OBJS = $(SRCS:.c=.o)
 
 LDFLAGS = -lm -lpthread
@@ -29,11 +29,11 @@ LDFLAGS = -lm -lpthread
 all: $(TARGET) $(LIBNAME) $(DUTIL)
 
 $(DUTIL): $(OBJS)
-	$(CC) $(FLAGS) $(OBJS) -o $(DUTIL) $(LDFLAGS)
+	$(CC) $(FLAGS) $(OBJS) dutil.c -o $(DUTIL) $(LDFLAGS)
 
 
 $(TARGET): $(OBJS) # Me genera el ejecutable (testdb.exe en Win) usando esta regla:
-	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LDFLAGS)
+	$(CC) $(CFLAGS) $(OBJS) test.c  -o $(TARGET) $(LDFLAGS)
 
 %.o: %.c # le digo al compilador como generar sus .obj a partir de los fuente
 	$(CC) $(CFLAGS) -c $< -o $@

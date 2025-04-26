@@ -106,7 +106,7 @@ typedef struct {
 #pragma pack(pop)
 #define SNODESZ(__S__) (sizeof(SNodeNSW) + (__S__) * sizeof(uint64_t))
 
-_Static_assert(sizeof(SIHdrNSW) == 24, "SIHdrNSW must be exactly 64 bytes");
+_Static_assert(sizeof(SIHdrNSW) == 24, "SIHdrNSW must be exactly 24 bytes");
 
 
 /**
