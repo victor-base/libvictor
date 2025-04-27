@@ -7,3 +7,5 @@ src/libvictor.dylib
 src/test_ld.c
 src/testdb.macos.dSYM/Contents/Info.plist
 src/testdb.macos.dSYM/Contents/Resources/Relocations/aarch64/testdb.macos.yml
+src/dutil
+victorpy.cpp

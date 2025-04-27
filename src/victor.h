@@ -97,7 +97,11 @@ typedef struct {
  */
 typedef struct {
     TimeStat insert;     // Insert operations timing
+#ifdef __cplusplus
+    TimeStat remove;
+#else
     TimeStat delete;     // Delete operations timing
+#endif
     TimeStat dump;       // Dump to file operation
     TimeStat search;     // Single search timing
     TimeStat search_n;   // Multi-search timing
