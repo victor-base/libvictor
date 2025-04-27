@@ -150,7 +150,12 @@ extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
  * Deletes a vector from the index by ID.
  * Wrapper for Index->delete.
  */
-extern int delete(Index *index, uint64_t id);
+#ifdef __cplusplus
+extern int cpp_delete(Index *index, uint64_t id); 
+#else
+extern int delete(Index *index, uint64_t id);  
+#endif
+
 
 /**
  * Update Index Context 

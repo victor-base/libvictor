@@ -305,7 +305,9 @@ cleanup:
     pthread_rwlock_unlock(&index->rwlock);
     return ret;
 }
-
+int cpp_delete(Index *index, uint64_t id) {
+    return delete(index, id);
+}
 /*
  * Retrieves internal timing statistics of an index.
  *
