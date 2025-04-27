@@ -9,3 +9,10 @@ src/testdb.macos.dSYM/Contents/Info.plist
 src/testdb.macos.dSYM/Contents/Resources/Relocations/aarch64/testdb.macos.yml
 src/dutil
 victorpy.cpp
+python/victor.hpp
+python/libvictor.dylib
+python/victor.cpython-311-darwin.so
+python/victor.h
+src/dutil.dSYM/Contents/Info.plist
+src/dutil.dSYM/Contents/Resources/DWARF/dutil
+src/dutil.dSYM/Contents/Resources/Relocations/aarch64/dutil.yml

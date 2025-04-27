@@ -2,7 +2,7 @@
 #define VICTOR_INDEX_HPP
 
 extern "C" {
-#include "victor.h"
+#include <victor/victor.h>
 }
 
 #include <vector>

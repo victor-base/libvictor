@@ -1,52 +1,62 @@
-# This section is responsible for detecting the operating system.
-# It can be used to set OS-specific variables or perform OS-specific tasks.
-
+# Detect OS
 OS := $(shell uname -s 2>/dev/null || echo Windows_NT)
 
-# Definir opciones según el SO
-
+# Configs based on OS
 ifeq ($(OS), Linux)
     TARGET = testdb
-	DUTIL  = dutil
-    LIBNAME = libvictor.so
+    DUTIL  = dutil
+    LIBNAME_SHARED = libvictor.so
+    LIBNAME_STATIC = libvictor.a
     CC = gcc
     CFLAGS = -g -Wall -Wextra -O3 -march=native -fPIC
+    INSTALL_LIB = cp libvictor.so libvictor.a /usr/local/lib/
 else ifeq ($(OS), Darwin)
-	TARGET = testdb.macos
-	DUTIL  = dutil
-	LIBNAME = libvictor.dylib
-	CC = gcc  
-	CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
+    TARGET = testdb.macos
+    DUTIL  = dutil
+    LIBNAME_SHARED = libvictor.dylib
+    LIBNAME_STATIC = libvictor.a
+    CC = gcc
+    CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
+    INSTALL_LIB = cp libvictor.dylib libvictor.a /usr/local/lib/
 endif
 
-# Source files & .obj instructiosm
-
+# Sources and objects
 SRCS = index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c index_nsw.c store.c file.c asort.c
 OBJS = $(SRCS:.c=.o)
 
 LDFLAGS = -lm -lpthread
 
-all: $(TARGET) $(LIBNAME) $(DUTIL)
+# Default target
+all: $(TARGET) $(LIBNAME_SHARED) $(LIBNAME_STATIC) $(DUTIL)
 
-$(DUTIL): $(OBJS)
-	$(CC) $(FLAGS) $(OBJS) dutil.c -o $(DUTIL) $(LDFLAGS)
+# Executable
+$(TARGET): $(OBJS) test.c
+	$(CC) $(CFLAGS) $(OBJS) test.c -o $(TARGET) $(LDFLAGS)
 
+# Dutil executable
+$(DUTIL): $(OBJS) dutil.c
+	$(CC) $(CFLAGS) $(OBJS) dutil.c -o $(DUTIL) $(LDFLAGS)
 
-$(TARGET): $(OBJS) # Me genera el ejecutable (testdb.exe en Win) usando esta regla:
-	$(CC) $(CFLAGS) $(OBJS) test.c  -o $(TARGET) $(LDFLAGS)
-
-%.o: %.c # le digo al compilador como generar sus .obj a partir de los fuente
+# Object files
+%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(LIBNAME): $(OBJS) # Creará la biblioteca compartida (libvictor.dll en Windows) usando la regla:
-	$(CC) -shared -o $(LIBNAME) $(OBJS) $(LDFLAGS)
+# Shared Library
+$(LIBNAME_SHARED): $(OBJS)
+	$(CC) -shared -o $(LIBNAME_SHARED) $(OBJS) $(LDFLAGS)
 
-# Borro los archivos generados como los .obj y todos los generados en las variables
+# Static Library
+$(LIBNAME_STATIC): $(OBJS)
+	ar rcs $(LIBNAME_STATIC) $(OBJS)
+
+# Clean build artifacts
 clean:
-	rm -f $(OBJS) $(TARGET) $(LIBNAME) $(DUTIL)
+	rm -f $(OBJS) $(TARGET) $(LIBNAME_SHARED) $(LIBNAME_STATIC) $(DUTIL)
 
+# Install to system directories
 install:
-	cp libvictor.dylib /usr/local/lib/
-	mkdir -p /usr/local/include/victor && cp victor.h /usr/local/include/victor/
+	mkdir -p /usr/local/include/victor
+	cp victor.h victor.hpp /usr/local/include/victor/
+	$(INSTALL_LIB)
 
-.PHONY: all clean
+.PHONY: all clean install
