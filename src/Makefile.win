@@ -1,6 +1,6 @@
-#Makefile exclusivo de Windows. 
-# - Para ejecutar el makefile: make -f .\Makefile.win, para limpiar: make -f .\Makefile.win clean
-# - Para generar el .exe: gcc -o runtest.exe test.o index.o index_flat.o math.o mem.o method.o vector.o iflat_utils.o index_flat_mp.o heap.o -L. -lvictor
+# Makefile exclusivo de Windows.
+# - Para ejecutar el makefile: make -f .\Makefile.win
+# - Para limpiar: make -f .\Makefile.win clean
 
 # Nombre de la librería (se generará .dll)
 LIB_NAME = libvictor.dll
@@ -12,14 +12,14 @@ EXEC = runtest.exe
 HEADERS = config.h index.h mem.h map.h time.h index_flat.h index_flat_mp.h vector.h heap.h math.h panic.h method.h victor.h
 
 # Archivos fuente
-SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c heap.c time.c map.c index_nsw.c store_nsw.c
+SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c index_flat_mp.c heap.c time.c map.c index_nsw.c store_nsw.c file.c
 
 # Archivos objeto correspondientes
 OBJS = $(SRCS:.c=.o)
 
 # Compilador y opciones
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -O3 -march=native
 
 # Regla para compilar cada archivo fuente .c a archivo objeto .o
 %.o: %.c $(HEADERS)
@@ -33,11 +33,13 @@ $(LIB_NAME): $(OBJS)
 $(EXEC): $(OBJS) $(LIB_NAME)
 	$(CC) $(OBJS) -o $(EXEC) -L. -lvictor
 
-# Regla para ejecutar todo (compilar la librería y el ejecutable)
-.PHONY: all
-all: $(LIB_NAME) $(EXEC)
-
 # Regla para limpiar archivos generados
 .PHONY: clean
 clean:
+ifeq ($(shell uname -o 2>/dev/null), Msys)
+	rm -f $(OBJS) $(EXEC) $(LIB_NAME)
+else ifeq ($(OS),Windows_NT)
 	del /Q $(subst /,\,$(OBJS)) $(EXEC) $(LIB_NAME)
+else
+	rm -f $(OBJS) $(EXEC) $(LIB_NAME)
+endif
