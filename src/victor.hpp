@@ -123,7 +123,7 @@ public:
      * @param id Unique identifier of the vector to delete.
      * @throws std::runtime_error on failure.
      */
-    void delete_vector(uint64_t id) {
+    void remove(uint64_t id) {
         if (!index_) throw std::runtime_error("Invalid Index");
         if (::cpp_delete(index_, id) != SUCCESS) {
             throw std::runtime_error("Delete operation failed");
