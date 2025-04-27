@@ -30,7 +30,7 @@ This RC of `libvictor` lays the foundation for a fast, embeddable and flexible v
 - [x] **Graph Index** — NSW Stable & Functional  
 - [x] **Deletion** — Deferred delete / mark inactive  
 - [ ] **Bindings** — Python / Go / Java — In progress / C# 🚧 
-- [X] **Persistence** — `dump()` and `load()` — In progress 🚧 
+- [X] **Persistence** — `dump()` and `load()`
 - [ ] **Benchmarks** — In progress 🚧  
 - [x] **Docs** — Public API complete 📄  
 - [ ] **Package** - Package Distribution 
@@ -152,7 +152,6 @@ Index *load_index(const char *filename);
 
 ```c
 #define FLAT_INDEX     0x00
-#define FLAT_INDEX_MP  0x01
 #define NSW_INDEX      0x02
 #define HNSW_INDEX     0x03
 ```

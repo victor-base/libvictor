@@ -8,7 +8,7 @@
 
 #define DIMS 512  // Número de dimensiones del vector de prueba
 #define TOP_N 5   // Número de mejores coincidencias a buscar
-#define NUM_VECTORS 1000000
+#define NUM_VECTORS 1000
 
 // Cantidad de vectores a insertar
 
@@ -57,7 +57,7 @@ void generate_random_vector(float32_t *vector, uint16_t dims) {
 int main() {
 	NSWContext context;
     srand(time(NULL)); // Inicializar la semilla de números aleatorios
-    int index_type = NSW_INDEX, ret;
+    int index_type = FLAT_INDEX, ret;
     int method = COSINE; // Método de prueba
     uint16_t dims = DIMS;
     MatchResult *result;
@@ -109,7 +109,7 @@ int main() {
 		
 	}
 
-	printf("%d", dump(index, "nsw.idx"));
+	printf("%d", dump(index, "nsw_flat.idx"));
 
 	for ( int i= 0; i < 100; i ++) {
 		delete(index, i+200);
@@ -119,7 +119,8 @@ int main() {
 	stats(index, &st);
 	print_index_stats(&st);
     destroy_index(&index);
-
+	return 0;
+/*
 	index = load_index("nsw.idx");
 	if (!index) {
         printf("Error: No se pudo asignar el índice.\n");
@@ -138,7 +139,7 @@ int main() {
 	if ((ret = search(index, vector, dims, &r)) != 0) {
 		printf("Error en la búsqueda. %d\n", ret);
 		return 1;
-	}
+	}*/
 	printf("----Result: %d\n", r.id);
 	stats(index, &st);
 	print_index_stats(&st);

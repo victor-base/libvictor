@@ -63,6 +63,7 @@ typedef enum {
     INVALID_ARGUMENT,
     INVALID_ID,
     INVALID_REF,
+    INVALID_METHOD,
     DUPLICATED_ENTRY,
     NOT_FOUND_ID,
     INDEX_EMPTY,
@@ -77,7 +78,6 @@ typedef enum {
  * Constants for index types.
  */
 #define FLAT_INDEX    0x00  // Sequential flat index (single-threaded)
-#define FLAT_INDEX_MP 0x01  // Flat index with multi-threaded support
 #define NSW_INDEX     0x02  // Navigable Small World graph
 #define HNSW_INDEX    0x03  // Hierarchical NSW (planned)
 
@@ -97,7 +97,11 @@ typedef struct {
  */
 typedef struct {
     TimeStat insert;     // Insert operations timing
+#ifdef __cplusplus
+    TimeStat remove;
+#else
     TimeStat delete;     // Delete operations timing
+#endif
     TimeStat dump;       // Dump to file operation
     TimeStat search;     // Single search timing
     TimeStat search_n;   // Multi-search timing
@@ -150,7 +154,12 @@ extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
  * Deletes a vector from the index by ID.
  * Wrapper for Index->delete.
  */
-extern int delete(Index *index, uint64_t id);
+#ifdef __cplusplus
+extern int cpp_delete(Index *index, uint64_t id); 
+#else
+extern int delete(Index *index, uint64_t id);  
+#endif
+
 
 /**
  * Update Index Context 
@@ -242,6 +251,50 @@ extern Index *load_index(const char *filename);
  */
 extern int destroy_index(Index **index);
 #endif
+
+/*
+ * Asynchronous Top-K Sort (ASort) implementation using a min-heap.
+ */
+typedef struct ASort ASort;
+
+/**
+ * @brief Initializes an ASort context.
+ *
+ * Allocates and initializes the internal heap used to store top-k matches.
+ *
+ * @param[in,out] as Pointer to the ASort context to initialize.
+ * @param[in] n Maximum number of elements to maintain in the heap.
+ * @param[in] method Matching method identifier for comparison.
+ * @return SUCCESS on success, or an error code on failure.
+ */
+extern int init_asort(ASort *as, int n, int method);
+
+/**
+ * @brief Adds multiple match results into the ASort structure.
+ *
+ * Inserts match results into the heap, keeping only the best k elements.
+ * If the heap is full, it replaces the worst element if a better match is found.
+ *
+ * @param[in,out] as Pointer to the ASort context.
+ * @param[in] inputs Array of match results to insert.
+ * @param[in] n Number of match results in the input array.
+ * @return SUCCESS on success, or an error code on failure.
+ */
+extern int as_update(ASort *as, MatchResult *inputs, int n);
+
+/**
+ * @brief Finalizes the ASort context and extracts sorted results.
+ *
+ * Pops elements from the internal heap into the output array in approximate order.
+ * If the output array is NULL, simply releases internal resources.
+ *
+ * @param[in,out] as Pointer to the ASort context.
+ * @param[out] outputs Array to store the extracted match results, or NULL to just free resources.
+ * @param[in] n Maximum number of results to extract.
+ * @return Number of results extracted on success, 0 if only freed, or an error code on failure.
+ */
+extern int as_close(ASort *as, MatchResult *outputs, int n);
+
 
 #endif //* __VICTOR_H */
 

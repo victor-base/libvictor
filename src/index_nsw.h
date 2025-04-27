@@ -56,7 +56,7 @@ typedef struct node_nsw {
 typedef struct {
     int ef_search;
     int ef_construct;
-	int odegree_computed;
+    int odegree_computed;
     int odegree_hl;
     int odegree_sl;
 
@@ -86,7 +86,7 @@ typedef struct {
     uint16_t odegree_sl;        /**< Soft limit for out-degree (used during insert). */
     uint8_t  odegree_computed;
     uint8_t  res[7];            /**< Reserved for future use (padding). */
-	uint64_t entry;             /**< Offset of the entry node (first search entrypoint). */
+    uint64_t entry;             /**< Offset of the entry node (first search entrypoint). */
 } SIHdrNSW;
 
 /**
@@ -106,7 +106,7 @@ typedef struct {
 #pragma pack(pop)
 #define SNODESZ(__S__) (sizeof(SNodeNSW) + (__S__) * sizeof(uint64_t))
 
-_Static_assert(sizeof(SIHdrNSW) == 24, "SIHdrNSW must be exactly 64 bytes");
+_Static_assert(sizeof(SIHdrNSW) == 24, "SIHdrNSW must be exactly 24 bytes");
 
 
 /**

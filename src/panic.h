@@ -35,14 +35,14 @@
  
 /* Always-on panic macro */
 #define PANIC_IF(cond, msg)                         \
-	do {                                            \
-		if (cond) {                                 \
-			fprintf(stderr,                         \
-				"[CORE PANIC] %s:%d: %s\n",         \
-				__FILE__, __LINE__, msg);           \
-			abort();                                \
-		}                                           \
-	} while (0)
+    do {                                            \
+        if (cond) {                                 \
+            fprintf(stderr,                         \
+                "[CORE PANIC] %s:%d: %s\n",         \
+                __FILE__, __LINE__, msg);           \
+            abort();                                \
+        }                                           \
+    } while (0)
 
 
 #endif

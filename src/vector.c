@@ -34,7 +34,7 @@
 
 
 Vector *alloc_vector(uint16_t dims_aligned) {
-	return (Vector *) aligned_calloc_mem(16, VECTORSZ(dims_aligned));
+    return (Vector *) aligned_calloc_mem(16, VECTORSZ(dims_aligned));
 }
  
 /**
@@ -50,7 +50,7 @@ Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims) {
     uint16_t dims_aligned = ALIGN_DIMS(dims);
     
 
-	vector = alloc_vector(dims_aligned);
+    vector = alloc_vector(dims_aligned);
     if (vector && src) {
         memcpy(vector->vector, src, dims * sizeof(float32_t));
         vector->id = id;
@@ -66,7 +66,7 @@ Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims) {
  */
 void free_vector(Vector **vector) {
     if (vector && *vector) {
-		free_aligned_mem(*vector);
-		*vector = NULL;
+        free_aligned_mem(*vector);
+        *vector = NULL;
     }
 }

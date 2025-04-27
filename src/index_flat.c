@@ -292,6 +292,20 @@ static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dim
     return SUCCESS;
 }
 
+static int flat_remap(void *index, Map *map) {
+    IndexFlat *idx = (IndexFlat *)index;
+    INodeFlat *ptr;
+
+    ptr = idx->head;
+    
+    while (ptr) {
+        if (ptr->vector)
+            if (map_insert_p(map, ptr->vector->id, ptr) != MAP_SUCCESS)
+                return SYSTEM_ERROR;
+        ptr = ptr->next;
+    }
+    return SUCCESS;
+}
 
 /*
  * flat_release - Releases all resources associated with a flat index.
@@ -318,6 +332,63 @@ static int flat_release(void **index) {
     return SUCCESS;
 }
 
+static int flat_dump(void *index, IOContext *io) {
+    IndexFlat *idx = index;
+    INodeFlat *entry = NULL;
+    if (io_init(io, idx->elements, 0, IO_INIT_VECTORS) != SUCCESS)
+        return SYSTEM_ERROR;
+
+    io->nsize = 0;
+    io->vsize = VECTORSZ(idx->dims_aligned);
+    io->dims = idx->dims;
+    io->dims_aligned = idx->dims_aligned;
+    io->itype = FLAT_INDEX;
+    io->method = idx->cmp->type;
+    io->hsize  = 0;
+
+    entry = idx->head;
+    for (int i = 0; entry; entry = entry->next, i++) {
+        PANIC_IF(i >= (int) io->elements, "index overflow while mapping entries");
+        io->vectors[i] = entry->vector;
+    }
+    return SUCCESS;
+}
+
+static IndexFlat *flat_load(IOContext *io) {
+    IndexFlat *index;
+    INodeFlat *entry = NULL;
+
+
+    index = calloc_mem(1, sizeof(IndexFlat));
+    if (index == NULL)
+        return NULL;
+
+    index->dims = io->dims;
+    index->dims_aligned = io->dims_aligned;
+    
+    index->cmp = get_method(io->method);
+
+    for (int i = 0; i < (int) io->elements; i++) {
+        entry = calloc_mem(1, sizeof(INodeFlat));
+        if (entry == NULL)
+            goto error_return;
+        
+        entry->vector = io->vectors[i];
+        insert_node(&index->head, entry);        
+    }
+    index->elements = io->elements;
+    return index;
+
+error_return:
+    entry = index->head;
+    while (entry) {
+        index->head = entry->next;
+        free_mem(entry);
+        entry = index->head;    
+    }
+    free_mem(index);
+    return NULL;
+}
 
 /*-------------------------------------------------------------------------------------*
  *                                PUBLIC FUNCTIONS                                     *
@@ -333,18 +404,35 @@ static int flat_release(void **index) {
  *
  * @return SUCCESS on success, SYSTEM_ERROR on failure.
  */
+
+ static inline void flat_functions(Index *idx) {
+    idx->search   = flat_search;
+    idx->search_n = flat_search_n;
+    idx->insert   = flat_insert;
+    idx->dump     = flat_dump;
+    idx->remap    = flat_remap;
+    idx->delete   = flat_delete;
+    idx->release  = flat_release;
+}
+
 int flat_index(Index *idx, int method, uint16_t dims) {
     idx->data = flat_init(method, dims);
     if (idx->data == NULL) 
         return SYSTEM_ERROR;
     idx->name     = "flat";
     idx->context  = NULL;
-    idx->search   = flat_search;
-    idx->search_n = flat_search_n;
-    idx->insert   = flat_insert;
-	idx->dump     = NULL;
-    idx->delete   = flat_delete;
-    idx->release  = flat_release;
+    flat_functions(idx);
+
+    return SUCCESS;
+}
+
+int flat_index_load(Index *idx, IOContext *io) {
+    idx->data = flat_load(io);
+    if (idx->data == NULL)
+        return SYSTEM_ERROR;
+    idx->name     = "flat";
+    idx->context  = NULL;
+    flat_functions(idx);
 
     return SUCCESS;
 }

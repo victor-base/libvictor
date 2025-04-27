@@ -189,23 +189,23 @@ static int compute_ef_search(uint64_t N, int M, int k) {
 static void nsw_inode2snode(SNodeNSW *dst, INodeNSW *src, int max_neighbors, IOContext *io) {
     int i;
     uint64_t iv;
-	uint64_t in;
+    uint64_t in;
 
-	PANIC_IF(src->odegree > max_neighbors, "odegree exceeds max_neighbors");
+    PANIC_IF(src->odegree > max_neighbors, "odegree exceeds max_neighbors");
 
 
-	PANIC_IF(
-		map_get_safe(&io->vat, (uint64_t)(uintptr_t) src->vector, &iv) == MAP_KEY_NOT_FOUND, 
-		"invalid vector reference in node"
-	);
+    PANIC_IF(
+        map_get_safe(&io->vat, (uint64_t)(uintptr_t) src->vector, &iv) == MAP_KEY_NOT_FOUND, 
+        "invalid vector reference in node"
+    );
     dst->vector  = iv;
     dst->odegree = (uint8_t) src->odegree;
     dst->alive   = (uint8_t) src->alive;
     for (i = 0; i < src->odegree; i++) {
         PANIC_IF(
-			map_get_safe(&io->nat, (uint64_t)(uintptr_t) src->neighbors[i], &in) == MAP_KEY_NOT_FOUND, 
-			"invalid neighbor reference in node"
-		);
+            map_get_safe(&io->nat, (uint64_t)(uintptr_t) src->neighbors[i], &in) == MAP_KEY_NOT_FOUND, 
+            "invalid neighbor reference in node"
+        );
         dst->neighbors[i] = in;
     }
     for ( ; i < max_neighbors; i++) {
@@ -275,122 +275,121 @@ int nsw_dump(void *idx, IOContext *io) {
     IndexNSW *index = (IndexNSW *) idx;
     SNodeNSW *node;
     INodeNSW *entry;
-	int ret = SUCCESS, i;
+    int ret = SUCCESS, i;
 
-	if (io_init(io, index->elements, sizeof(SIHdrNSW), 1) != SUCCESS)
-		return SYSTEM_ERROR;
-	
-	io->nsize = SNODESZ(index->odegree_hl);
-	io->vsize = VECTORSZ(index->dims_aligned);
-	io->hsize = sizeof(SIHdrNSW);
-	io->dims = index->dims;
-	io->dims_aligned = index->dims_aligned;
-	io->elements = index->elements;
-	io->itype = NSW_INDEX;
-	io->method = index->cmp->type;
-	
+    if (io_init(io, index->elements, sizeof(SIHdrNSW), IO_INIT_HEADER | IO_INIT_MAPS | IO_INIT_NODES | IO_INIT_VECTORS) != SUCCESS)
+        return SYSTEM_ERROR;
+    
+    io->nsize = SNODESZ(index->odegree_hl);
+    io->vsize = VECTORSZ(index->dims_aligned);
+    io->dims = index->dims;
+    io->dims_aligned = index->dims_aligned;
+    io->elements = index->elements;
+    io->itype = NSW_INDEX;
+    io->method = index->cmp->type;
+    
 
     entry = index->lentry;
     for (i = 0; entry; entry = entry->next, i++) {
-		PANIC_IF(i >= (int) io->elements, "index overflow while mapping entries");
-		if (map_insert(&io->nat, (uintptr_t)entry, i) != MAP_SUCCESS) {
-			ret = SYSTEM_ERROR;
-			goto cleanup;
-		}
+        PANIC_IF(i >= (int) io->elements, "index overflow while mapping entries");
+        if (map_insert(&io->nat, (uintptr_t)entry, i) != MAP_SUCCESS) {
+            ret = SYSTEM_ERROR;
+            goto cleanup;
+        }
 
-		io->vectors[i] = entry->vector;
-		if (map_insert(&io->vat, (uintptr_t)entry->vector, i) != MAP_SUCCESS) {
-			ret = SYSTEM_ERROR;
-			goto cleanup;
-		}
-	}
+        io->vectors[i] = entry->vector;
+        if (map_insert(&io->vat, (uintptr_t)entry->vector, i) != MAP_SUCCESS) {
+            ret = SYSTEM_ERROR;
+            goto cleanup;
+        }
+    }
 
     entry = index->lentry;    
-	for (i = 0; entry; entry = entry->next, i++) {
-		PANIC_IF(i >= (int) io->elements, "index overflow while mapping entries");
-		node = (SNodeNSW *) calloc_mem(1, io->nsize);
-		if (!node) {
-			ret = SYSTEM_ERROR;
-			goto cleanup;
-		}
+    for (i = 0; entry; entry = entry->next, i++) {
+        PANIC_IF(i >= (int) io->elements, "index overflow while mapping entries");
+        node = (SNodeNSW *) calloc_mem(1, io->nsize);
+        if (!node) {
+            ret = SYSTEM_ERROR;
+            goto cleanup;
+        }
         nsw_inode2snode(node, entry, index->odegree_hl, io);
         io->nodes[i] = node;
     }
 
-	((SIHdrNSW *)io->header)->ef_construct = index->ef_construct;
-	((SIHdrNSW *)io->header)->ef_search = index->ef_search;
-	((SIHdrNSW *)io->header)->odegree_computed = index->odegree_computed;
-	((SIHdrNSW *)io->header)->odegree_hl = index->odegree_hl;
-	((SIHdrNSW *)io->header)->odegree_sl = index->odegree_sl;
-	
-	uint64_t gptr;
-	PANIC_IF(
-		map_get_safe(&io->nat, (uint64_t)(uintptr_t) index->gentry, &gptr) == MAP_KEY_NOT_FOUND, 
-		"invalid gentry reference in map"
-	);
+    ((SIHdrNSW *)io->header)->ef_construct = index->ef_construct;
+    ((SIHdrNSW *)io->header)->ef_search = index->ef_search;
+    ((SIHdrNSW *)io->header)->odegree_computed = index->odegree_computed;
+    ((SIHdrNSW *)io->header)->odegree_hl = index->odegree_hl;
+    ((SIHdrNSW *)io->header)->odegree_sl = index->odegree_sl;
+    
+    uint64_t gptr;
+    PANIC_IF(
+        map_get_safe(&io->nat, (uint64_t)(uintptr_t) index->gentry, &gptr) == MAP_KEY_NOT_FOUND, 
+        "invalid gentry reference in map"
+    );
 
-	((SIHdrNSW *)io->header)->entry = gptr;
+    ((SIHdrNSW *)io->header)->entry = gptr;
 
 cleanup:
-	if (ret != SUCCESS)
-		io_free(io);
+    if (ret != SUCCESS)
+        io_free(io);
     return ret;
 }
 
 
 
-IndexNSW *nsw_load(IOContext *io) {
-	IndexNSW *idx = NULL; 
+static IndexNSW *nsw_load(IOContext *io) {
+    IndexNSW *idx = NULL; 
     INodeNSW **inodes;
-	INodeNSW *entry;
-	SIHdrNSW *hdr = io->header;
+    INodeNSW *entry;
+    SIHdrNSW *hdr = io->header;
 
-	inodes = calloc_mem(io->elements, sizeof(INodeNSW *));
-	if (inodes == NULL)
-		return NULL;
+    inodes = calloc_mem(io->elements, sizeof(INodeNSW *));
+    if (inodes == NULL)
+        return NULL;
 
-	entry = NULL;
-	for (int i = 0; i < (int) io->elements; i++) {
-		if ((inodes[i] = calloc_mem(1, NSW_NODESZ(hdr->odegree_hl))) == NULL) {
-			while (i && i-- >= 0) {
-				free_mem(inodes[i]);
-				inodes[i] = NULL;
-			}
-			free_mem(inodes);
-			return NULL;
-		}
-		inodes[i]->next = entry;
-		entry = inodes[i];
-	} 
+    entry = NULL;
+    for (int i = 0; i < (int) io->elements; i++) {
+        if ((inodes[i] = calloc_mem(1, NSW_NODESZ(hdr->odegree_hl))) == NULL) {
+            while (i && i-- >= 0) {
+                free_mem(inodes[i]);
+                inodes[i] = NULL;
+            }
+            free_mem(inodes);
+            return NULL;
+        }
+        inodes[i]->next = entry;
+        entry = inodes[i];
+    } 
     
-	for (int i = 0; i < (int)io->elements; i++)
-		if (nsw_snode2inode(inodes[i], io->nodes[i], hdr->odegree_hl, io, inodes) != SUCCESS)
-			goto error;
+    for (int i = 0; i < (int)io->elements; i++)
+        if (nsw_snode2inode(inodes[i], io->nodes[i], hdr->odegree_hl, io, inodes) != SUCCESS)
+            goto error;
 
     idx = (IndexNSW *) calloc_mem(1, sizeof(IndexNSW));
     if (!idx) 
-		goto error;
+        goto error;
 
-	idx->cmp = get_method(io->method);
-	idx->dims = io->dims;
-	idx->dims_aligned = io->dims_aligned;
-	idx->ef_construct = hdr->ef_construct;
-	idx->ef_search = hdr->ef_search;
-	idx->elements  = io->elements;
-	idx->odegree_computed = hdr->odegree_computed;
-	idx->odegree_hl = hdr->odegree_hl;
-	idx->odegree_sl = hdr->odegree_sl;
-	idx->lentry = entry;
-	idx->gentry = inodes[hdr->entry];
-	return idx;
+    idx->cmp = get_method(io->method);
+    idx->dims = io->dims;
+    idx->dims_aligned = io->dims_aligned;
+    idx->ef_construct = hdr->ef_construct;
+    idx->ef_search = hdr->ef_search;
+    idx->elements  = io->elements;
+    idx->odegree_computed = hdr->odegree_computed;
+    idx->odegree_hl = hdr->odegree_hl;
+    idx->odegree_sl = hdr->odegree_sl;
+    idx->lentry = entry;
+    idx->gentry = inodes[hdr->entry];
+    return idx;
 
 error:
-	for (int i = 0; i < (int)io->elements; i++) {
-		free_mem(inodes[i]);
-		inodes[i] = NULL;
-	}
-	free_mem(inodes);
-	return NULL;
+    for (int i = 0; i < (int)io->elements; i++) {
+        free_mem(inodes[i]);
+        inodes[i] = NULL;
+    }
+    free_mem(inodes);
+    return NULL;
 }
 /**
  * Initializes a new NSW (Navigable Small World) index structure with the given
@@ -431,7 +430,7 @@ static IndexNSW *nsw_init(int method, uint16_t dims, NSWContext *context) {
     index->gentry = NULL;
     index->lentry = NULL;
     index->elements = 0;
-	index->odegree_computed = 0;
+    index->odegree_computed = 0;
 
     index->dims = dims;
     index->dims_aligned = ALIGN_DIMS(dims);
@@ -439,11 +438,11 @@ static IndexNSW *nsw_init(int method, uint16_t dims, NSWContext *context) {
     index->ef_construct = context == NULL ? EF_AUTOTUNED : context->ef_construct;
     index->odegree_hl = HARDLIMIT_M;
     if (context == NULL || context->odegree == OD_PROGESIVE) {
-		index->odegree_computed = 1;
+        index->odegree_computed = 1;
         index->odegree_sl = compute_odegree(0);
-	} else {
+    } else {
         index->odegree_sl = context->odegree;
-	}
+    }
     return index;
 }
 
@@ -469,6 +468,8 @@ static IndexNSW *nsw_init(int method, uint16_t dims, NSWContext *context) {
 static int init_search_context(SearchContext *sc, int ef, int k, int (*cmp)(float32_t, float32_t)) {
     PANIC_IF(ef < 0, "invalid parameter ef");
     PANIC_IF(k < 0, "invalid parameter k");
+
+    sc->visited = MAP_INIT();
     if (init_heap(&sc->W, HEAP_MIN, ef, cmp) != HEAP_SUCCESS)
         return SYSTEM_ERROR;
     if (init_heap(&sc->C, HEAP_MAX, NOLIMIT_HEAP, cmp) != HEAP_SUCCESS) {
@@ -681,7 +682,7 @@ static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResu
         return INDEX_EMPTY;
 
     v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
-	if (v == NULL)
+    if (v == NULL)
         return SYSTEM_ERROR;
 
     memcpy(v, vector, dims * sizeof(float32_t));
@@ -694,7 +695,7 @@ static int nsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResu
         free_aligned_mem(v);
         return SYSTEM_ERROR;
     }
-		
+        
     if ((ret = nsw_explore(entry,&sc,v,idx->dims_aligned, idx->cmp)) == SUCCESS)
         for (int k = heap_size(&sc.W); k > 0; k = heap_size(&sc.W)) {
             HeapNode node;
@@ -750,25 +751,25 @@ static int nsw_release(void **index) {
 
 
 static int nsw_delete(void *index, void *ref) {
-	if (!index) return INVALID_INDEX;
-	INodeNSW *ptr = (INodeNSW *) ref;	
-	ptr->alive = 0;
-	return SUCCESS;
+    if (!index) return INVALID_INDEX;
+    INodeNSW *ptr = (INodeNSW *) ref;	
+    ptr->alive = 0;
+    return SUCCESS;
 }
 
 static int nsw_remap(void *index, Map *map) {
-	IndexNSW *idx = (IndexNSW *)index;
+    IndexNSW *idx = (IndexNSW *)index;
     INodeNSW *ptr;
 
-	ptr = idx->lentry;
-	
+    ptr = idx->lentry;
+    
     while (ptr) {
         if (ptr->alive && ptr->vector)
-			if (map_insert_p(map, ptr->vector->id, ptr) != MAP_SUCCESS)
-				return SYSTEM_ERROR;
+            if (map_insert_p(map, ptr->vector->id, ptr) != MAP_SUCCESS)
+                return SYSTEM_ERROR;
         ptr = ptr->next;
     }
-	return SUCCESS;
+    return SUCCESS;
 }
 
 /**
@@ -800,7 +801,7 @@ INodeNSW *make_inodensw(uint64_t id, float32_t *vector, uint16_t dims, int odegr
     if (node == NULL)
         return NULL;
 
-	node->alive  = 1;
+    node->alive  = 1;
     node->vector = make_vector(id, vector, dims);
     if (node->vector == NULL) {
         free_mem(node);
@@ -961,8 +962,8 @@ static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims
         *ref = node;
         return SUCCESS;
     }
-	node->next = idx->lentry;
-	idx->lentry = node;
+    node->next = idx->lentry;
+    idx->lentry = node;
 
     if (idx->ef_construct == EF_AUTOTUNED)
         ef = compute_ef_construction(idx->elements, idx->odegree_sl);
@@ -982,15 +983,15 @@ static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims
             PANIC_IF(heap_pop(&sc.W, &candidate) == HEAP_ERROR_EMPTY, "lack of consistency");
             neighbor = (INodeNSW *) HEAP_NODE_PTR(candidate);
             nsw_connect_to(idx, node, neighbor, 1);
-			
+            
         }
-		idx->elements++;
+        idx->elements++;
     } else {
         free_vector(&(node->vector));
         free_mem(node);
     }
-	if (idx->odegree_computed)
-		idx->odegree_sl = compute_odegree(idx->elements);
+    if (idx->odegree_computed)
+        idx->odegree_sl = compute_odegree(idx->elements);
     destroy_search_context(&sc);
     return ret;
 }
@@ -1027,12 +1028,12 @@ static int nsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims
  */
 
 static inline void nsw_functions(Index *idx) {
-	idx->search   = nsw_search;
+    idx->search   = nsw_search;
     idx->search_n = nsw_search_n;
     idx->insert   = nsw_insert;
-	idx->dump     = nsw_dump;
+    idx->dump     = nsw_dump;
     idx->delete   = nsw_delete;
-	idx->remap    = nsw_remap;
+    idx->remap    = nsw_remap;
     idx->release  = nsw_release;
 }
 
@@ -1043,15 +1044,15 @@ int nsw_index(Index *idx, int method, uint16_t dims, NSWContext *context) {
     idx->name     = "nsw";
     idx->context  = context;
     nsw_functions(idx);
-	return SUCCESS;
+    return SUCCESS;
 }
 
 int nsw_index_load(Index *idx, IOContext *io) {
-	idx->data = nsw_load(io);
-	if (idx->data == NULL) 
+    idx->data = nsw_load(io);
+    if (idx->data == NULL) 
         return SYSTEM_ERROR;
-	idx->name     = "nsw";
+    idx->name     = "nsw";
     idx->context  = NULL;
     nsw_functions(idx);
-	return SUCCESS;
+    return SUCCESS;
 }

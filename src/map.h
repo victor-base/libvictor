@@ -64,7 +64,13 @@ typedef struct {
     MapNode  **map;               // Array of buckets
 } Map;
 
-
+#define MAP_INIT() ((Map){ \
+    .lfactor = 0, \
+    .lfactor_thrhold = 0, \
+    .mapsize = 0, \
+    .elements = 0, \
+    .map = NULL \
+})
 
 /**
  * Checks whether the specified ID exists in the map.

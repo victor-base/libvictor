@@ -36,7 +36,7 @@
   * This function abstracts `calloc` to allow for future optimizations.
   */
 void *calloc_mem(size_t __count, size_t __size) {
-	return calloc(__count, __size);
+    return calloc(__count, __size);
 }
  
 /**
@@ -44,7 +44,7 @@ void *calloc_mem(size_t __count, size_t __size) {
   * This function abstracts `realloc` to allow for future optimizations or custom allocators.
   */
 void *realloc_mem(void *__ptr, size_t __size) {
-	return realloc(__ptr, __size);
+    return realloc(__ptr, __size);
 }
 
 
@@ -53,7 +53,7 @@ void *realloc_mem(void *__ptr, size_t __size) {
   * This function abstracts `free` to allow for future memory management strategies.
   */
 void free_mem(void *__mem) {
-	free(__mem);
+    free(__mem);
 }
 
 
@@ -71,21 +71,21 @@ void free_mem(void *__mem) {
  * @return Pointer to zero-initialized aligned memory, or NULL on failure.
  */
 void *aligned_calloc_mem(size_t alignment, size_t size) {
-	void *ptr = NULL;
+    void *ptr = NULL;
 
 #if defined(_WIN32)
-	ptr = _aligned_malloc(size, alignment);
-	if (ptr) memset(ptr, 0, size);
+    ptr = _aligned_malloc(size, alignment);
+    if (ptr) memset(ptr, 0, size);
 #elif defined(__APPLE__) || defined(__linux__) || defined(__unix__)
-	if (posix_memalign(&ptr, alignment, size) == 0)
-		memset(ptr, 0, size);
-	else
-		ptr = NULL;
+    if (posix_memalign(&ptr, alignment, size) == 0)
+        memset(ptr, 0, size);
+    else
+        ptr = NULL;
 #else
-	#error "aligned_calloc_mem is not supported on this platform"
+    #error "aligned_calloc_mem is not supported on this platform"
 #endif
 
-	return ptr;
+    return ptr;
 }
 
 /**
@@ -96,8 +96,8 @@ void *aligned_calloc_mem(size_t alignment, size_t size) {
  */
 void free_aligned_mem(void *ptr) {
 #if defined(_WIN32)
-	_aligned_free(ptr);
+    _aligned_free(ptr);
 #else
-	free(ptr);
+    free(ptr);
 #endif
 }
