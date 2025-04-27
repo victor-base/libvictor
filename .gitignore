@@ -16,3 +16,4 @@ python/victor.h
 src/dutil.dSYM/Contents/Info.plist
 src/dutil.dSYM/Contents/Resources/DWARF/dutil
 src/dutil.dSYM/Contents/Resources/Relocations/aarch64/dutil.yml
+python/binding.cpp
