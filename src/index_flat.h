@@ -59,5 +59,6 @@
   */
  extern int flat_index(Index *idx, int method, uint16_t dims);
  
+ extern int flat_index_load(Index *idx, IOContext *io);
  #endif
  

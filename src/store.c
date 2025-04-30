@@ -166,6 +166,9 @@ int store_dump_file(const char *filename, IOContext *io) {
     uint64_t noff;
     int ret = SUCCESS;
 
+
+    memset(&hdr, 0, sizeof(StoreHDR));
+
     PANIC_IF(filename == NULL, "invalid filename pointer");
     PANIC_IF(io == NULL, "invalid io context");
     PANIC_IF(io->vectors == NULL, "vectors could not be null");
@@ -202,6 +205,7 @@ int store_dump_file(const char *filename, IOContext *io) {
                 goto end;
             }
         }
+        hdr.only_vectors = 0;
     } else {
         hdr.only_vectors = 1;
         noff = 0;
@@ -246,6 +250,7 @@ int store_load_file(const char *filename, IOContext *io) {
     StoreHDR hdr;
     int ret = SUCCESS;
     int mode = 0;
+    int itype;
 
     memset(&hdr, 0, sizeof(StoreHDR));
 
@@ -258,7 +263,7 @@ int store_load_file(const char *filename, IOContext *io) {
         return FILEIO_ERROR;
     }
 
-    if ((io->itype = magic_to_index(hdr.magic)) == -1) {
+    if ((itype = magic_to_index(hdr.magic)) == -1) {
         file_close(fp);
         return INVALID_FILE;
     }
@@ -280,10 +285,13 @@ int store_load_file(const char *filename, IOContext *io) {
     io->dims_aligned = hdr.dims_aligned;
     io->method       = hdr.method;
     io->elements     = hdr.elements;
+    io->itype        = itype;
 
-    if (file_read(io->header, hdr.hsize, 1, fp) != 1) {
-        file_close(fp);
-        return FILEIO_ERROR;
+    if (mode & IO_INIT_HEADER) {
+        if (file_read(io->header, hdr.hsize, 1, fp) != 1) {
+            file_close(fp);
+            return FILEIO_ERROR;
+        }
     }
 
     if ((pos = file_tello(fp)) != (off_t)-1 && (uint64_t) pos != hdr.voff) {
@@ -303,20 +311,22 @@ int store_load_file(const char *filename, IOContext *io) {
         }
     }
 
-    if ((pos = file_tello(fp)) != (off_t)-1 && (uint64_t) pos != hdr.noff) {
-        ret = INVALID_FILE;
-        goto error_return;
-    }
-
-    for (int i = 0; i < (int) hdr.elements; i++ ) {
-        io->nodes[i] = calloc_mem(1, hdr.nsize);
-        if (io->nodes[i] == NULL) {
-            ret = SYSTEM_ERROR;
+    if (mode & IO_INIT_NODES) {
+        if ((pos = file_tello(fp)) != (off_t)-1 && (uint64_t) pos != hdr.noff) {
+            ret = INVALID_FILE;
             goto error_return;
         }
-        if (file_read(io->nodes[i], hdr.nsize, 1, fp) != 1) {
-            ret = FILEIO_ERROR;
-            goto error_return;
+
+        for (int i = 0; i < (int) hdr.elements; i++ ) {
+            io->nodes[i] = calloc_mem(1, hdr.nsize);
+            if (io->nodes[i] == NULL) {
+                ret = SYSTEM_ERROR;
+                goto error_return;
+            }
+            if (file_read(io->nodes[i], hdr.nsize, 1, fp) != 1) {
+                ret = FILEIO_ERROR;
+                goto error_return;
+            }
         }
     }
 

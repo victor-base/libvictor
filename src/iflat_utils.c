@@ -127,10 +127,10 @@ void flat_linear_search(INodeFlat *current, float32_t *v, uint16_t dims_aligned,
  * @return SYSTEM_ERROR or SUCESS
  */
 int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp) {
-    Heap heap;
+    Heap heap = HEAP_INIT();
     HeapNode node;
     float32_t distance;
-    
+
     if (init_heap(&heap, HEAP_MIN, n, cmp->is_better_match) == HEAP_ERROR_ALLOC)
         return SYSTEM_ERROR;
     

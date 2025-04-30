@@ -52,6 +52,7 @@ typedef struct {
     float32_t distance;
 } HeapNode;
 
+
 typedef struct {
     int (*is_better_match) (float32_t, float32_t);
     
@@ -61,6 +62,17 @@ typedef struct {
     int type;	   /* Heap Type    */
     int e;         /* Number of elements in the heap */
 } Heap;
+
+
+#define HEAP_INIT() ((Heap){ \
+    .is_better_match = NULL, \
+    .c_size = 0, \
+    .m_size = 0, \
+    .type = 0, \
+    .heap = NULL, \
+    .e = 0 \
+})
+
 
 typedef enum {
     HEAP_SUCCESS = 0,             // Operación exitosa

@@ -543,6 +543,10 @@ Index *load_index(const char *filename) {
         case NSW_INDEX:
             ret = nsw_index_load(idx, &io);
             break;
+
+        case FLAT_INDEX:
+            ret = flat_index_load(idx, &io);
+            break;
         default:
             ret = NOT_IMPLEMENTED;
             break;
