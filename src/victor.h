@@ -75,6 +75,18 @@ typedef enum {
 } ErrorCode;
 
 /**
+ * victor_strerror - Returns a human-readable error message for an ErrorCode.
+ *
+ * This function maps each error code to a descriptive string suitable
+ * for logs, stderr, or user-facing error messages.
+ *
+ * @param code  The ErrorCode value.
+ *
+ * @return A constant string with the error description.
+ */
+extern const char *victor_strerror(ErrorCode code);
+
+/**
  * Constants for index types.
  */
 #define FLAT_INDEX    0x00  // Sequential flat index (single-threaded)

@@ -82,6 +82,7 @@ const char *__LIB_SHORT_VERSION() {
     } while(0)
 
 
+
 /*
  * Searches for the `n` nearest vectors in the index to a given query vector.
  *
