@@ -46,7 +46,7 @@ int init_asort(ASort *as, int n, int method) {
 	if (!as->heap) 
 		return SYSTEM_ERROR;
 
-	if (init_heap(as->heap, HEAP_MIN, n, cmp->is_better_match) != HEAP_SUCCESS) {
+	if (init_heap(as->heap, HEAP_WORST_TOP, n, cmp->is_better_match) != HEAP_SUCCESS) {
 		free_mem(as->heap);
 		as->heap = NULL;
 		return SYSTEM_ERROR;

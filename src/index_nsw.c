@@ -470,9 +470,9 @@ static int init_search_context(SearchContext *sc, int ef, int k, int (*cmp)(floa
     PANIC_IF(k < 0, "invalid parameter k");
 
     sc->visited = MAP_INIT();
-    if (init_heap(&sc->W, HEAP_MIN, ef, cmp) != HEAP_SUCCESS)
+    if (init_heap(&sc->W, HEAP_WORST_TOP, ef, cmp) != HEAP_SUCCESS)
         return SYSTEM_ERROR;
-    if (init_heap(&sc->C, HEAP_MAX, NOLIMIT_HEAP, cmp) != HEAP_SUCCESS) {
+    if (init_heap(&sc->C, HEAP_BETTER_TOP, NOLIMIT_HEAP, cmp) != HEAP_SUCCESS) {
         heap_destroy(&sc->W);
         return SYSTEM_ERROR;
     }
@@ -1042,7 +1042,6 @@ int nsw_index(Index *idx, int method, uint16_t dims, NSWContext *context) {
     if (idx->data == NULL) 
         return SYSTEM_ERROR;
     idx->name     = "nsw";
-    idx->context  = context;
     nsw_functions(idx);
     return SUCCESS;
 }
@@ -1052,7 +1051,6 @@ int nsw_index_load(Index *idx, IOContext *io) {
     if (idx->data == NULL) 
         return SYSTEM_ERROR;
     idx->name     = "nsw";
-    idx->context  = NULL;
     nsw_functions(idx);
     return SUCCESS;
 }

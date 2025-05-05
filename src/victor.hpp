@@ -36,17 +36,8 @@ private:
     }
 
 public:
-    VictorIndex(int type, int method, uint16_t dims) {
-        NSWContext ctx;
-        if (type == NSW_INDEX) {
-            ctx.ef_construct = 64;
-            ctx.ef_search = 100;
-            ctx.odegree = 32;
-            index_ = alloc_index(type, method, dims, &ctx);
-        } else {
-            index_ = alloc_index(type, method, dims, nullptr);
-        }
-
+    VictorIndex(int type, int method, uint16_t dims, void *ctx) {
+        index_ = alloc_index(type, method, dims, ctx);
         if (!index_) {
             throw std::runtime_error("Failed to allocate Index");
         }

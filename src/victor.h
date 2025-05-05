@@ -130,6 +130,16 @@ typedef struct {
     int odegree;
 } NSWContext;
 
+#define HNSW_CONTEXT 0x01
+#define HNSW_CONTEXT_SET_EF_CONSTRUCT 1 << 2
+#define HNSW_CONTEXT_SET_EF_SEARCH    1 << 3
+#define HNSW_CONTEXT_SET_M0           1 << 4
+typedef struct {
+    int ef_search;
+    int ef_construct;
+    int M0;
+} HNSWContext;
+
 #ifndef _LIB_CODE
 
 typedef struct Index Index;
@@ -176,7 +186,7 @@ extern int delete(Index *index, uint64_t id);
 /**
  * Update Index Context 
  */
-extern int update_icontext(Index *index, void *icontext);
+extern int update_icontext(Index *index, void *icontext, int mode);
 
 /**
  * Retrieves the internal statistics of the index.
@@ -244,7 +254,10 @@ extern int contains(Index *index, uint64_t id);
  */
 extern Index *alloc_index(int type, int method, uint16_t dims, void *icontext);
 
-
+/**
+ * Return index name
+ */
+extern const char* index_name(Index *index);
 /**
  * Loads an index from a previously dumped file.
  *
@@ -265,7 +278,7 @@ extern int destroy_index(Index **index);
 #endif
 
 /*
- * Asynchronous Top-K Sort (ASort) implementation using a min-heap.
+ * Asynchronous Top-K Sort (ASort) implementation using a best-heap.
  */
 typedef struct ASort ASort;
 

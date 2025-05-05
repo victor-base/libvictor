@@ -48,6 +48,7 @@
 #include "map.h"
 #include "time.h"
 #include "index_flat.h"
+#include "index_hnsw.h"
 #include "index_nsw.h"
 
 
@@ -247,6 +248,20 @@ int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims) {
 cleanup:
     pthread_rwlock_unlock(&index->rwlock);
     return ret;
+}
+
+int update_icontext(Index *index, void *context, int mode) {
+    int ret;
+	if (index->data == NULL)
+        return INVALID_INIT;
+
+	if (index->update_icontext == NULL)
+		return NOT_IMPLEMENTED;
+    
+    pthread_rwlock_wrlock(&index->rwlock);
+	ret = index->update_icontext(index->data, context, mode);
+    pthread_rwlock_unlock(&index->rwlock);
+	return ret;
 }
 
 /*
@@ -469,7 +484,12 @@ int destroy_index(Index **index) {
     return SUCCESS;
 }
 
+const char *index_name(Index *index) {
+	if (!index || !index->data)
+		return "{}";
 
+	return index->name;
+}
 
 /*
  * Allocates and initializes a new index.
@@ -504,6 +524,10 @@ Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
     case NSW_INDEX:
         ret = nsw_index(idx, method, dims, icontext);
         break;
+
+	case HNSW_INDEX:
+		ret = hnsw_index(idx, method, dims, icontext);
+		break;
     default:
         ret = INVALID_INDEX;
         break;

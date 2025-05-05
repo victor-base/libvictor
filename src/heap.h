@@ -34,10 +34,10 @@
 #define PARENT(i)  ( (i) == 0 ? 0 : ((i) - 1) / 2 )
 
 #define NOLIMIT_HEAP -1
-#define DEFAULT_SIZE 50
+#define DEFAULT_SIZE 500
 
-#define HEAP_MIN 1
-#define HEAP_MAX 2
+#define HEAP_WORST_TOP  1
+#define HEAP_BETTER_TOP 2
 
 
 typedef struct {
@@ -73,6 +73,20 @@ typedef struct {
     .e = 0 \
 })
 
+#define HEAP_NODE_NULL() ((HeapNode){ \
+    .value.u  = 0, \
+    .distance = 0.0 \
+})
+
+#define HEAP_NODE_SET_PTR(__p__,__d__) ((HeapNode) { \
+    .value.p  = (__p__), \
+    .distance = (__d__)  \
+})
+
+#define HEAP_NODE_SET_U64(__u__,__d__) ((HeapNode) { \
+    .value.u  = (__u__), \
+    .distance = (__d__)  \
+})
 
 typedef enum {
     HEAP_SUCCESS = 0,             // Operación exitosa
@@ -158,6 +172,7 @@ extern int heap_pop(Heap *h, HeapNode *node);
  */
 extern int heap_peek(Heap *h, HeapNode *node);
 
+extern int heap_cap(Heap *h);
 
 extern void heap_destroy(Heap *h);
 

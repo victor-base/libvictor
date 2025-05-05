@@ -413,6 +413,7 @@ error_return:
     idx->remap    = flat_remap;
     idx->delete   = flat_delete;
     idx->release  = flat_release;
+	idx->update_icontext = NULL;
 }
 
 int flat_index(Index *idx, int method, uint16_t dims) {
@@ -420,7 +421,6 @@ int flat_index(Index *idx, int method, uint16_t dims) {
     if (idx->data == NULL) 
         return SYSTEM_ERROR;
     idx->name     = "flat";
-    idx->context  = NULL;
     flat_functions(idx);
 
     return SUCCESS;
@@ -431,7 +431,6 @@ int flat_index_load(Index *idx, IOContext *io) {
     if (idx->data == NULL)
         return SYSTEM_ERROR;
     idx->name     = "flat";
-    idx->context  = NULL;
     flat_functions(idx);
 
     return SUCCESS;

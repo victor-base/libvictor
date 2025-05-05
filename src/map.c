@@ -209,13 +209,28 @@ int init_map(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold) {
         return MAP_ERROR_ALLOC;
 
     map->mapsize = initial_size;
-    map->lfactor = 0;
     map->lfactor_thrhold = lfactor_thrhold;
     map->elements = 0;
 
     return MAP_SUCCESS;
 }
 
+/**
+ * Reset the map
+ */
+void map_purge(Map *map) {
+    MapNode *node;
+    if (!map || !map->map)
+        return;
+    for (uint32_t i = 0; i < map->mapsize; ++i) {
+        while (map->map[i]) {
+            node = map->map[i];
+            map->map[i] = node->next;
+            free_mem(node);
+        }
+    }
+    map->elements = 0;
+}
 /**
  * Destroys the map and frees all memory associated with it.
  */

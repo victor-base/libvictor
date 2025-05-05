@@ -56,7 +56,6 @@ _Static_assert(sizeof(uintptr_t) <= sizeof(uint64_t), "Pointers won't fit in uin
  * number of elements currently inserted, and the map buckets.
  */
 typedef struct {
-    uint16_t lfactor;             // Current load factor
     uint16_t lfactor_thrhold;     // Load factor threshold for triggering rehash
     uint32_t mapsize;             // Total number of buckets
 
@@ -65,7 +64,6 @@ typedef struct {
 } Map;
 
 #define MAP_INIT() ((Map){ \
-    .lfactor = 0, \
     .lfactor_thrhold = 0, \
     .mapsize = 0, \
     .elements = 0, \
@@ -124,6 +122,11 @@ extern int map_insert_p(Map *map, uint64_t key, void *value);
  * @return SUCCESS on success, error code otherwise.
  */
 extern int init_map(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold);
+
+/**
+ * Reset the map
+ */
+extern void map_purge(Map *map);
 
 /**
  * Destroys the map and frees all allocated memory.

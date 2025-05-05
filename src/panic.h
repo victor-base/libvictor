@@ -43,6 +43,4 @@
             abort();                                \
         }                                           \
     } while (0)
-
-
 #endif

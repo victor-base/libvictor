@@ -72,7 +72,6 @@
 typedef struct Index {
     char *name;        // Name of the indexing method (e.g., "Flat", "HNSW")
     void *data;        // Pointer to the specific index data structure
-    void *context;     // Additional context for advanced indexing needs
 
     IndexStats stats;  // Accumulated timing statistics for operations
 
@@ -111,6 +110,8 @@ typedef struct Index {
      * @return 0 if successful, or -1 on error.
      */
     int (*insert)(void *, uint64_t, float32_t *, uint16_t, void **ref);
+
+	int (*update_icontext)(void *, void *, int);
 
     int (*remap)(void *, Map *);
 

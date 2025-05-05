@@ -77,7 +77,7 @@ static int heapify_down(Heap *h) {
         int r = RCHD(i);
         int target = i;
 
-        if (h->type == HEAP_MAX) {
+        if (h->type == HEAP_BETTER_TOP) {
             if (l < h->e && h->is_better_match(h->heap[l].distance, h->heap[target].distance)) {
                 target = l;
             }
@@ -124,7 +124,7 @@ static int heapify_up(Heap *h) {
         if ( i == 0 ) break;
         int p = PARENT(i);
 
-        if (h->type == HEAP_MAX) {
+        if (h->type == HEAP_BETTER_TOP) {
             if (h->is_better_match(h->heap[i].distance, h->heap[p].distance)) {
                 swap(&h->heap[i], &h->heap[p]);
                 i = p;
@@ -179,7 +179,9 @@ int heap_replace(Heap *h, const HeapNode *node) {
         return HEAP_ERROR_EMPTY;
 
     h->heap[0] = *node;
-    return heapify_down(h);
+    if (h->e > 1)
+        return heapify_down(h);
+    return HEAP_SUCCESS;
 }
 
 /**
@@ -224,7 +226,8 @@ int heap_insert(Heap *h, const HeapNode *node) {
     }
 
     h->heap[h->e++] = *node;
-    heapify_up(h);
+    if (h->e > 1)
+        return heapify_up(h);
     return HEAP_SUCCESS;
 }
 
@@ -242,7 +245,7 @@ int init_heap(Heap *h, int type, int max_size, int (*cmp)(float32_t, float32_t))
     PANIC_IF(h == NULL, "h is NULL");
     PANIC_IF(cmp == NULL, "comparator cmp is NULL");
 
-    if (type != HEAP_MAX && type != HEAP_MIN)
+    if (type != HEAP_BETTER_TOP && type != HEAP_WORST_TOP)
         return HEAP_ERROR_INVALID_TYPE;
 
     if (max_size < 0 && max_size != NOLIMIT_HEAP)
@@ -260,9 +263,14 @@ int init_heap(Heap *h, int type, int max_size, int (*cmp)(float32_t, float32_t))
     return HEAP_SUCCESS;
 }
 
+int heap_cap(Heap *h) {
+    return h->m_size;
+}
+
 void heap_destroy(Heap *h) {
     if ( h && h->heap) {
         free_mem(h->heap);
+        h->heap = NULL;
         h->e = 0;
         h->c_size = 0;
         h->m_size = 0;
