@@ -307,3 +307,22 @@ int heap_full(Heap *h) {
 
     return 1;
 }
+
+int heap_insert_or_replace_if_better(Heap *h, const HeapNode *node) {
+	PANIC_IF(h == NULL || h->heap == NULL, "h or h->heap is NULL");
+	PANIC_IF(h->type != HEAP_WORST_TOP, "method only valid in HEAP_WORST_TOP");
+	PANIC_IF(h->m_size == NOLIMIT_HEAP, "method only valid with limited size heap");
+
+	/* Is Full */
+	if (h->e == h->c_size) {
+		if (h->is_better_match(node->distance, h->heap[0].distance))
+			h->heap[0] = *node;
+		if (h->e > 1)
+			return heapify_down(h);
+	} else {
+		h->heap[h->e++] = *node;
+		if (h->e > 1)
+			return heapify_up(h);
+	}
+	return HEAP_SUCCESS;
+}

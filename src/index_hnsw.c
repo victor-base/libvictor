@@ -36,7 +36,6 @@ static int hnsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
 
 	if (init_heap(&R, HEAP_BETTER_TOP, n, idx->cmp->is_better_match)!= HEAP_SUCCESS)
 		return SYSTEM_ERROR;
-
 	ret = graph_knn_search(idx, vector, &R, n);
 	if (ret == SUCCESS) 
 		for (int i = 0; i < n && heap_size(&R) > 0; i++) {
@@ -64,6 +63,7 @@ static int hnsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dim
 		free_graph_node(&node);
 		return SYSTEM_ERROR;
 	}
+
 	*ref = node;
 	return SUCCESS;
 }
@@ -154,8 +154,8 @@ static IndexHNSW *hnsw_init(int method, uint16_t dims, HNSWContext *context) {
     index->dims = dims;
     index->dims_aligned = ALIGN_DIMS(dims);
 	if (context == NULL) {
-		index->ef_search    = 128;
-		index->ef_construct = 64;
+		index->ef_search    = 110;
+		index->ef_construct = 220;
 		index->M0 = 32;
 	} else {
 		index->ef_search    = context->ef_search;

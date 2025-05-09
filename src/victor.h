@@ -50,6 +50,18 @@ typedef struct {
 #define COSINE 0x01  // Cosine Similarity
 #define DOTP   0x02  // Dot Product
 
+#include <stdio.h>
+
+#define PRINT_VECTOR(where,vec, dims)                              \
+    do {                                                     \
+        printf("%s [", (where));                                         \
+        for (int _i = 0; _i < (dims); ++_i) {                \
+            printf("%s%.4f", (_i == 0 ? "" : ", "), (vec)[_i]); \
+        }                                                    \
+        printf("]\n");                                       \
+    } while (0)
+
+
 /**
  * Enumeration of error codes returned by index operations.
  */
@@ -320,6 +332,7 @@ extern int as_update(ASort *as, MatchResult *inputs, int n);
  */
 extern int as_close(ASort *as, MatchResult *outputs, int n);
 
+extern int gcp_init(int num_threads);
 
 #endif //* __VICTOR_H */
 

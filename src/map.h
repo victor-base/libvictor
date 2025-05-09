@@ -56,14 +56,16 @@ _Static_assert(sizeof(uintptr_t) <= sizeof(uint64_t), "Pointers won't fit in uin
  * number of elements currently inserted, and the map buckets.
  */
 typedef struct {
-    uint16_t lfactor_thrhold;     // Load factor threshold for triggering rehash
+    uint16_t rehash;              // Rehahes
+	uint16_t lfactor_thrhold;     // Load factor threshold for triggering rehash
     uint32_t mapsize;             // Total number of buckets
-
+	
     uint64_t elements;            // Total number of elements stored
     MapNode  **map;               // Array of buckets
 } Map;
 
 #define MAP_INIT() ((Map){ \
+	.rehash = 0, \
     .lfactor_thrhold = 0, \
     .mapsize = 0, \
     .elements = 0, \

@@ -533,7 +533,6 @@ static int search_layer(SearchContext *sc, GraphNode **ep, int len, int ef, int 
     float32_t d;
     int ret = SYSTEM_ERROR, i;
 
-
     if (init_map(&visited, 1000, 15) != MAP_SUCCESS)
         goto cleanup_return;
 
@@ -548,7 +547,6 @@ static int search_layer(SearchContext *sc, GraphNode **ep, int len, int ef, int 
         if (current && current->vector) {
             d = sc->cmp->compare_vectors(current->vector->vector, sc->query, sc->dims_aligned);
             n = HEAP_NODE_SET_PTR(current, d);
-
             ret = map_insert_p(&visited, current->vector->id, NULL);
             if (ret != MAP_SUCCESS) {
                 heap_destroy(W);
@@ -558,15 +556,16 @@ static int search_layer(SearchContext *sc, GraphNode **ep, int len, int ef, int 
             PANIC_IF(heap_insert(W, &n)  != HEAP_SUCCESS, "invalid heap");
         }
     }
-    
+
     while(heap_size(&C) > 0) {
 
         PANIC_IF(heap_pop(&C, &c)  != HEAP_SUCCESS, "lack of consistency");
 
         PANIC_IF(heap_peek(W, &w) != HEAP_SUCCESS, "lack of consistency");
 
-        if (heap_full(W) && sc->cmp->is_better_match(w.distance, c.distance))
-            break;
+        if (heap_full(W) && sc->cmp->is_better_match(w.distance, c.distance)) 
+			break;
+		
         
         current = (GraphNode *) HEAP_NODE_PTR(c);
         for (i = 0; i < (int) ODEGREE(current, level); i++) {
@@ -580,13 +579,12 @@ static int search_layer(SearchContext *sc, GraphNode **ep, int len, int ef, int 
                 }
                 d = sc->cmp->compare_vectors(sc->query, neighbor->vector->vector, sc->dims_aligned);
                 n = HEAP_NODE_SET_PTR(neighbor, d);
+                if (!heap_full(W) || sc->cmp->is_better_match(d, w.distance)) {	
+					PANIC_IF(heap_insert(&C, &n) == HEAP_ERROR_FULL, "bad initialization");
+				}
                 
-                PANIC_IF(heap_insert(&C, &n) == HEAP_ERROR_FULL, "bad initialization");
-
                 if (neighbor->alive) {
                     if (heap_full(W)) {
-                        PANIC_IF(heap_peek(W, &w) == HEAP_ERROR_EMPTY, "error on peek in a full heap");
-                        
                         if (sc->cmp->is_better_match(n.distance, w.distance)) {
                             PANIC_IF(heap_replace(W, &n) != HEAP_SUCCESS, "cannot replace worst node in W");
                         }
@@ -802,8 +800,7 @@ int graph_knn_search(IndexHNSW *idx, float32_t *vector, Heap *R, int k) {
     if (!sc.query) 
         return SYSTEM_ERROR;
 
-	memcpy(sc.query, vector, idx->dims_aligned);
-
+	memcpy(sc.query, vector, idx->dims_aligned*sizeof(float32_t));
     sc.cmp = idx->cmp;
     sc.dims_aligned = idx->dims_aligned;
 

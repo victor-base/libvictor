@@ -160,7 +160,7 @@ static int map_rehash(Map *map, uint32_t new_mapsize) {
     free_mem(map->map);
     map->map = new_map;
     map->mapsize = new_mapsize;
-
+	map->rehash++;
     return MAP_SUCCESS;
 }
 
@@ -211,6 +211,7 @@ int init_map(Map *map, uint32_t initial_size, uint16_t lfactor_thrhold) {
     map->mapsize = initial_size;
     map->lfactor_thrhold = lfactor_thrhold;
     map->elements = 0;
+	map->rehash = 0;
 
     return MAP_SUCCESS;
 }

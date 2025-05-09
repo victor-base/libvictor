@@ -67,5 +67,6 @@
 	"optional": "cpp",
 	"ratio": "cpp",
 	"vector": "cpp"
-}
+},
+"liveServer.settings.port": 5501
 }

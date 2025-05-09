@@ -13,21 +13,22 @@ ifeq ($(OS), Linux)
 else ifeq ($(OS), Darwin)
     TARGET = testdb.macos
     DUTIL  = dutil
+	MUTATE = mutate
     LIBNAME_SHARED = libvictor.dylib
     LIBNAME_STATIC = libvictor.a
     CC = gcc
-    CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
+    CFLAGS = -g -std=c11 -Wall -Wextra -O3 -ffast-math -march=native -fPIC
     INSTALL_LIB = cp libvictor.dylib libvictor.a /usr/local/lib/
 endif
 
 # Sources and objects
-SRCS = index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c index_nsw.c store.c file.c asort.c
+SRCS = index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c index_nsw.c store.c file.c asort.c graph.c index_hnsw.c
 OBJS = $(SRCS:.c=.o)
 
 LDFLAGS = -lm -lpthread
 
 # Default target
-all: $(TARGET) $(LIBNAME_SHARED) $(LIBNAME_STATIC) $(DUTIL)
+all: $(TARGET) $(LIBNAME_SHARED) $(LIBNAME_STATIC) #$(DUTIL) $(MUTATE)
 
 # Executable
 $(TARGET): $(OBJS) test.c
@@ -36,6 +37,10 @@ $(TARGET): $(OBJS) test.c
 # Dutil executable
 $(DUTIL): $(OBJS) dutil.c
 	$(CC) $(CFLAGS) $(OBJS) dutil.c -o $(DUTIL) $(LDFLAGS)
+
+# Mutate executable
+$(MUTATE): $(OBJS) mutate.c
+	$(CC) $(CFLAGS) $(OBJS) mutate.c -o $(MUTATE) $(LDFLAGS)
 
 # Object files
 %.o: %.c

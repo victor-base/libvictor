@@ -174,6 +174,8 @@ extern int heap_peek(Heap *h, HeapNode *node);
 
 extern int heap_cap(Heap *h);
 
+extern int heap_insert_or_replace_if_better(Heap *h, const HeapNode *node);
+
 extern void heap_destroy(Heap *h);
 
 #endif

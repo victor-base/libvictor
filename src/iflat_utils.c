@@ -126,7 +126,7 @@ void flat_linear_search(INodeFlat *current, float32_t *v, uint16_t dims_aligned,
  * @param cmp          - Pointer to the CmpMethod structure that defines the comparison functions.
  * @return SYSTEM_ERROR or SUCESS
  */
-int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp) {
+int flat_linear_search_n(INodeFlat *current, float32_t *restrict v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp) {
     Heap heap = HEAP_INIT();
     HeapNode node;
     float32_t distance;
@@ -140,30 +140,18 @@ int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned
         result[i].id = NULL_ID;
     }
     while (current) {
-        distance = cmp->compare_vectors(current->vector->vector, v, dims_aligned);
-
-        if (heap_full(&heap)) {
-            PANIC_IF(heap_peek(&heap, &node) == HEAP_ERROR_EMPTY, "peek on empty heap");
-            if (cmp->is_better_match(distance, node.distance)) {
-                HEAP_NODE_PTR(node) = current;
-                node.distance = distance;
-                PANIC_IF(heap_replace(&heap, &node) == HEAP_ERROR_EMPTY, "replace on empty heap");
-            }
-        } else {
-            HEAP_NODE_PTR(node) = current;
-            node.distance = distance;
-            PANIC_IF(heap_insert(&heap, &node) == HEAP_ERROR_FULL, "insert on full heap");
-        }
-        current = current->next;
+		node.distance = cmp->compare_vectors(current->vector->vector, v, dims_aligned);
+		HEAP_NODE_PTR(node) = current;
+		PANIC_IF(heap_insert_or_replace_if_better(&heap, &node) != HEAP_SUCCESS, "error in heap");
+     	current = current->next;
     }
 
     k = heap_size(&heap);
-    for (k = heap_size(&heap); k > 0; k = heap_size(&heap)) {
-        heap_pop(&heap, &node);
-        result[k-1].distance = node.distance;
-        result[k-1].id = ((INodeFlat *)HEAP_NODE_PTR(node))->vector->id;
-    }
-
+	while (k > 0) {
+		heap_pop(&heap, &node);
+		result[--k].distance = node.distance;
+		result[k].id = ((INodeFlat *)HEAP_NODE_PTR(node))->vector->id;
+	}
     heap_destroy(&heap);
     return SUCCESS;
 }

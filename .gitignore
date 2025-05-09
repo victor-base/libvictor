@@ -17,3 +17,10 @@ src/dutil.dSYM/Contents/Info.plist
 src/dutil.dSYM/Contents/Resources/DWARF/dutil
 src/dutil.dSYM/Contents/Resources/Relocations/aarch64/dutil.yml
 python/binding.cpp
+src/libvictor.a
+src/mutate
+src/mutate.dSYM/Contents/Info.plist
+src/mutate.dSYM/Contents/Resources/DWARF/mutate
+src/mutate.dSYM/Contents/Resources/Relocations/aarch64/mutate.yml
+src/1.csv
+src/2.csv
