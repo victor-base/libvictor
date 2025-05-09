@@ -43,6 +43,9 @@ public:
         }
     }
 
+	VictorIndex(int type, int method, uint16_t dims)
+    : VictorIndex(type, method, dims, nullptr) {}
+
     ~VictorIndex() {
         if (index_) {
             ::destroy_index(&index_);
