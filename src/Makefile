@@ -17,7 +17,7 @@ else ifeq ($(OS), Darwin)
     LIBNAME_SHARED = libvictor.dylib
     LIBNAME_STATIC = libvictor.a
     CC = gcc
-    CFLAGS = -g -std=c11 -Wall -Wextra -O3 -ffast-math -march=native -fPIC
+    CFLAGS = -g -std=c11 -Wall -Wextra -O3 -march=native -fPIC
     INSTALL_LIB = cp libvictor.dylib libvictor.a /usr/local/lib/
 endif
 
