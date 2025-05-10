@@ -332,7 +332,6 @@ extern int as_update(ASort *as, MatchResult *inputs, int n);
  */
 extern int as_close(ASort *as, MatchResult *outputs, int n);
 
-extern int gcp_init(int num_threads);
 
 #endif //* __VICTOR_H */
 

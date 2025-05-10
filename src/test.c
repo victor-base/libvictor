@@ -10,7 +10,7 @@
 
 #define DIMS 128
 #define TOP_N 10
-#define NUM_VECTORS 100000
+#define NUM_VECTORS 20000
 #define QUERY_COUNT 1000
 #define NOISE_LEVEL 0.2f
 
@@ -99,8 +99,8 @@ int main() {
 
     printf("Lib version: %s\n", __LIB_VERSION());
 
-    Index *flat = alloc_index(FLAT_INDEX, L2NORM, DIMS, NULL);
-    Index *hnsw = alloc_index(HNSW_INDEX, L2NORM, DIMS, &context);
+    Index *flat = alloc_index(FLAT_INDEX, DOTP, DIMS, NULL);
+    Index *hnsw = alloc_index(HNSW_INDEX, DOTP, DIMS, &context);
     if (!flat || !hnsw) {
         printf("Error creando índices.\n");
         return 1;
@@ -120,6 +120,8 @@ int main() {
             printf("Error insertando vector %d\n", i + 1);
             return 1;
         }
+		if (i % 5000 == 0)
+			printf("%10d - inserted\n", i);
     }
 
     MatchResult *flat_result = calloc(TOP_N, sizeof(MatchResult));
