@@ -10,10 +10,10 @@ LIB_NAME = libvictor.dll
 EXEC = runtest.exe
 
 # Archivos de cabecera (headers)
-HEADERS = config.h index.h mem.h map.h time.h index_flat.h index_nsw.h vector.h heap.h math.h panic.h method.h victor.h store.h
+HEADERS = config.h index.h mem.h map.h time.h index_flat.h index_nsw.h vector.h heap.h math.h panic.h method.h victor.h store.h graph.h file.h iflat_utils.h
 
 # Archivos fuente
-SRCS = test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c index_nsw.c file.c store.c
+SRCS = index_hnsw.c test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c index_nsw.c file.c store.c asort.c graph.c error.c
 
 # Archivos objeto correspondientes
 OBJS = $(SRCS:.c=.o)
