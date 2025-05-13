@@ -26,46 +26,46 @@ static void init_random_seed() {
  * @returns ErrorCode (SUCCESS or failure reason)
  */
 static int hnsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResult *result, int n) {
-	IndexHNSW *idx = (IndexHNSW *)index;
-	Heap R = HEAP_INIT();
-	HeapNode r;
-	int ret;
+    IndexHNSW *idx = (IndexHNSW *)index;
+    Heap R = HEAP_INIT();
+    HeapNode r;
+    int ret;
 
-	if (dims != idx->dims)
-		return INVALID_DIMENSIONS;
+    if (dims != idx->dims)
+        return INVALID_DIMENSIONS;
 
-	if (init_heap(&R, HEAP_BETTER_TOP, n, idx->cmp->is_better_match)!= HEAP_SUCCESS)
-		return SYSTEM_ERROR;
-	ret = graph_knn_search(idx, vector, &R, n);
-	if (ret == SUCCESS) 
-		for (int i = 0; i < n && heap_size(&R) > 0; i++) {
-			PANIC_IF(heap_pop(&R, &r) != HEAP_SUCCESS, "error in heap");
-			result[i].distance = r.distance;
-			result[i].id = ((GraphNode* )HEAP_NODE_PTR(r))->vector->id; 
-		}
+    if (init_heap(&R, HEAP_BETTER_TOP, n, idx->cmp->is_better_match)!= HEAP_SUCCESS)
+        return SYSTEM_ERROR;
+    ret = graph_knn_search(idx, vector, &R, n);
+    if (ret == SUCCESS) 
+        for (int i = 0; i < n && heap_size(&R) > 0; i++) {
+            PANIC_IF(heap_pop(&R, &r) != HEAP_SUCCESS, "error in heap");
+            result[i].distance = r.distance;
+            result[i].id = ((GraphNode* )HEAP_NODE_PTR(r))->vector->id; 
+        }
 
-	heap_destroy(&R);
-	return ret;
+    heap_destroy(&R);
+    return ret;
 }
 
 static int hnsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims, void **ref) {
-	IndexHNSW *idx = (IndexHNSW *)index;
-	GraphNode *node;
-	
-	if (dims != idx->dims)
-		return INVALID_DIMENSIONS;
-	
-	node = alloc_graph_node(id, vector, idx->dims_aligned, idx->M0);
-	if (node == NULL)
-		return SYSTEM_ERROR;
+    IndexHNSW *idx = (IndexHNSW *)index;
+    GraphNode *node;
+    
+    if (dims != idx->dims)
+        return INVALID_DIMENSIONS;
+    
+    node = alloc_graph_node(id, vector, idx->dims_aligned, idx->M0);
+    if (node == NULL)
+        return SYSTEM_ERROR;
 
-	if (graph_insert(idx, node) != SUCCESS) {
-		free_graph_node(&node);
-		return SYSTEM_ERROR;
-	}
+    if (graph_insert(idx, node) != SUCCESS) {
+        free_graph_node(&node);
+        return SYSTEM_ERROR;
+    }
 
-	*ref = node;
-	return SUCCESS;
+    *ref = node;
+    return SUCCESS;
 }
 
 /**
@@ -98,7 +98,7 @@ static int hnsw_release(void **index) {
     while (ptr) {
         idx->lentry = ptr->next;
         idx->elements--;
-		free_graph_node(&ptr);
+        free_graph_node(&ptr);
         ptr = idx->lentry;
     }
 
@@ -137,11 +137,11 @@ static int hnsw_delete(void *index, void *ref) {
  * @return Pointer to the newly initialized IndexHNSW, or NULL on failure.
  */
 static IndexHNSW *hnsw_init(int method, uint16_t dims, HNSWContext *context) {
-	IndexHNSW *index = (IndexHNSW *) calloc_mem(1,sizeof(IndexHNSW));
+    IndexHNSW *index = (IndexHNSW *) calloc_mem(1,sizeof(IndexHNSW));
     if (index == NULL)
         return NULL;
 
-	init_random_seed();
+    init_random_seed();
     index->cmp = get_method(method);
     if (!index->cmp) {
         free_mem(index);
@@ -153,15 +153,15 @@ static IndexHNSW *hnsw_init(int method, uint16_t dims, HNSWContext *context) {
 
     index->dims = dims;
     index->dims_aligned = ALIGN_DIMS(dims);
-	if (context == NULL) {
-		index->ef_search    = 110;
-		index->ef_construct = 220;
-		index->M0 = 32;
-	} else {
-		index->ef_search    = context->ef_search;
-		index->ef_construct = context->ef_construct;
-		index->M0 = context->M0;
-	}
+    if (context == NULL) {
+        index->ef_search    = 110;
+        index->ef_construct = 220;
+        index->M0 = 32;
+    } else {
+        index->ef_search    = context->ef_search;
+        index->ef_construct = context->ef_construct;
+        index->M0 = context->M0;
+    }
     return index;
 }
 
@@ -182,18 +182,18 @@ static int hnsw_remap(void *index, Map *map) {
 }
 
 static int hnsw_update_icontext(void *index, void *context, int mode) {
-	IndexHNSW   *idx = (IndexHNSW *) index;
-	HNSWContext *ctx = (HNSWContext *) context;
+    IndexHNSW   *idx = (IndexHNSW *) index;
+    HNSWContext *ctx = (HNSWContext *) context;
 
-	if (mode & HNSW_CONTEXT) {
-		if (mode & HNSW_CONTEXT_SET_EF_CONSTRUCT)
-			idx->ef_construct = ctx->ef_construct;
-		if (mode & HNSW_CONTEXT_SET_EF_SEARCH)
-			idx->ef_search = ctx->ef_search;
-		if (mode & HNSW_CONTEXT_SET_M0)
-			idx->M0 = ctx->M0;
-	}
-	return SUCCESS;
+    if (mode & HNSW_CONTEXT) {
+        if (mode & HNSW_CONTEXT_SET_EF_CONSTRUCT)
+            idx->ef_construct = ctx->ef_construct;
+        if (mode & HNSW_CONTEXT_SET_EF_SEARCH)
+            idx->ef_search = ctx->ef_search;
+        if (mode & HNSW_CONTEXT_SET_M0)
+            idx->M0 = ctx->M0;
+    }
+    return SUCCESS;
 }
 
 
@@ -205,7 +205,7 @@ static inline void hnsw_functions(Index *idx) {
     idx->remap    = hnsw_remap;
     idx->delete   = hnsw_delete;
     idx->release  = hnsw_release;
-	idx->update_icontext = hnsw_update_icontext;
+    idx->update_icontext = hnsw_update_icontext;
 }
 
 int hnsw_index(Index *idx, int method, uint16_t dims, HNSWContext *context) {
