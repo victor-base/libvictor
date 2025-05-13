@@ -391,7 +391,9 @@ static int backlink_connect_with_shrink(SearchContext *sc, GraphNode *n, GraphNo
             IDEGREE(c, level)--;
             ODEGREE(n, level)--;
             NEIGHBOR_AT(n, level, i) = NULL;
-        }
+        } else {
+			PANIC_IF(1==1, "c && c->vector");
+		}
     }
     // Now add e to the queue
     d = sc->cmp->compare_vectors(e->vector->vector, n->vector->vector, sc->dims_aligned);
@@ -439,6 +441,7 @@ static int connect_to(SearchContext *sc, GraphNode *e, GraphNode *n, int level, 
     PANIC_IF(i == M, "invalid odegree");
     NEIGHBOR_AT(e,level,i) = n;
     ODEGREE(e, level)++;
+	IDEGREE(n, level)++;
     return backlink_connect_with_shrink(sc, n, e, level, M);
 }
 
