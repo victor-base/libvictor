@@ -392,8 +392,8 @@ static int backlink_connect_with_shrink(SearchContext *sc, GraphNode *n, GraphNo
             ODEGREE(n, level)--;
             NEIGHBOR_AT(n, level, i) = NULL;
         } else {
-			PANIC_IF(1==1, "c && c->vector");
-		}
+            PANIC_IF(1==1, "c && c->vector");
+        }
     }
     // Now add e to the queue
     d = sc->cmp->compare_vectors(e->vector->vector, n->vector->vector, sc->dims_aligned);
@@ -441,7 +441,7 @@ static int connect_to(SearchContext *sc, GraphNode *e, GraphNode *n, int level, 
     PANIC_IF(i == M, "invalid odegree");
     NEIGHBOR_AT(e,level,i) = n;
     ODEGREE(e, level)++;
-	IDEGREE(n, level)++;
+    IDEGREE(n, level)++;
     return backlink_connect_with_shrink(sc, n, e, level, M);
 }
 
@@ -567,8 +567,8 @@ static int search_layer(SearchContext *sc, GraphNode **ep, int len, int ef, int 
         PANIC_IF(heap_peek(W, &w) != HEAP_SUCCESS, "lack of consistency");
 
         if (heap_full(W) && sc->cmp->is_better_match(w.distance, c.distance)) 
-			break;
-		
+            break;
+        
         
         current = (GraphNode *) HEAP_NODE_PTR(c);
         for (i = 0; i < (int) ODEGREE(current, level); i++) {
@@ -583,8 +583,8 @@ static int search_layer(SearchContext *sc, GraphNode **ep, int len, int ef, int 
                 d = sc->cmp->compare_vectors(sc->query, neighbor->vector->vector, sc->dims_aligned);
                 n = HEAP_NODE_SET_PTR(neighbor, d);
                 if (!heap_full(W) || sc->cmp->is_better_match(d, w.distance)) {	
-					PANIC_IF(heap_insert(&C, &n) == HEAP_ERROR_FULL, "bad initialization");
-				}
+                    PANIC_IF(heap_insert(&C, &n) == HEAP_ERROR_FULL, "bad initialization");
+                }
                 
                 if (neighbor->alive) {
                     if (heap_full(W)) {
@@ -797,13 +797,13 @@ int graph_knn_search(IndexHNSW *idx, float32_t *vector, Heap *R, int k) {
     HeapNode w;
     int i, ret = SYSTEM_ERROR;
 
-	PANIC_IF(heap_cap(R) != k, "incorrect space allocation in R");
+    PANIC_IF(heap_cap(R) != k, "incorrect space allocation in R");
 
     sc.query = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
     if (!sc.query) 
         return SYSTEM_ERROR;
 
-	memcpy(sc.query, vector, idx->dims_aligned*sizeof(float32_t));
+    memcpy(sc.query, vector, idx->dims_aligned*sizeof(float32_t));
     sc.cmp = idx->cmp;
     sc.dims_aligned = idx->dims_aligned;
 
@@ -827,8 +827,8 @@ int graph_knn_search(IndexHNSW *idx, float32_t *vector, Heap *R, int k) {
 
     for (int n = heap_size(&W); n > 0; n = heap_size(&W)) {
         PANIC_IF(heap_pop(&W, &w) != HEAP_SUCCESS, "invalid condition");
-		PANIC_IF(heap_insert(R, &w) != HEAP_SUCCESS, "invalid condition");
-	}
+        PANIC_IF(heap_insert(R, &w) != HEAP_SUCCESS, "invalid condition");
+    }
     ret = SUCCESS;
 
 return_with_error:
