@@ -46,7 +46,7 @@
 #include "index.h"
 #include "mem.h"
 #include "map.h"
-#include "time.h"
+#include "vtime.h"
 #include "index_flat.h"
 #include "index_hnsw.h"
 #include "index_nsw.h"

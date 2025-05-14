@@ -28,7 +28,7 @@
 
 #include "config.h"
 #include "method.h"
-#include "math.h"
+#include "vmath.h"
  
  /**
   * Array of comparison methods available in the system.
