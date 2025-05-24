@@ -40,8 +40,8 @@
  * Contact: emiliano.billi@gmail.com
  */
 
- #ifndef __FLAT_INDEX_H
- #define __FLAT_INDEX_H 1
+#ifndef __FLAT_INDEX_H
+#define __FLAT_INDEX_H 1
  
 #include "index.h"
  /**

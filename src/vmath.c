@@ -55,7 +55,7 @@
  * @note This function assumes that the input vectors are aligned and
  *       that `dims` is a multiple of 4 for optimal SIMD performance.
  */
-float32_t euclidean_distance(float32_t *v1, float32_t *v2, int dims)
+float32_t euclidean_distance_squared(float32_t *v1, float32_t *v2, int dims)
 {
     float32_t sum = 0.0f;
     int i;
@@ -103,12 +103,51 @@ float32_t euclidean_distance(float32_t *v1, float32_t *v2, int dims)
 
 #endif
 
-    return sqrtf(sum);
+    return sum;
+}
+float32_t euclidean_distance(float32_t *v1, float32_t *v2, int dims) {
+	return sqrtf(euclidean_distance_squared(v1, v2, dims));
 }
 
 int euclidean_distance_best(float32_t a, float32_t b)
 {
     return (a < b) ? 1 : 0;
+}
+
+float32_t norm(float32_t *v, int dims) {
+#ifdef __ARM_NEON
+	float32x4_t acc_norm = vdupq_n_f32(0.0f);
+	for (int i = 0; i < dims; i += 4) {
+		float32x4_t a = vld1q_f32(v + i);
+		acc_norm = vmlaq_f32(acc_norm, a, a);
+	}
+	return sqrtf(vaddvq_f32(acc_norm));
+#elif defined(__SSE__)
+	__m128 acc_norm = _mm_setzero_ps();
+	for (int i = 0; i < dims; i += 4) {
+		__m128 a = _mm_loadu_ps(v + i); // más seguro si no tenés garantía de alineamiento
+		acc_norm = _mm_add_ps(acc_norm, _mm_mul_ps(a, a));
+	}
+	__m128 shuf = _mm_movehdup_ps(acc_norm);
+	acc_norm = _mm_add_ps(acc_norm, shuf);
+	shuf = _mm_movehl_ps(shuf, acc_norm);
+	acc_norm = _mm_add_ss(acc_norm, shuf);
+	return sqrtf(_mm_cvtss_f32(acc_norm));
+#else
+	float32_t n = 0.0f;
+	for (int i = 0; i < dims; i++) 
+		n += v[i] * v[i];
+	return sqrtf(n);
+#endif
+}
+
+void normalize(float32_t *v, int dims) {
+	float32_t n = norm(v,dims);
+	if (n < 1e-6f) {
+    printf("WARNING: row is nearly zero after orthogonalization\n");
+}
+	for (int i=0; i < dims; i++)
+		v[i] /= n;
 }
 
 /**
@@ -261,3 +300,4 @@ float32_t dot_product(float32_t *v1, float32_t *v2, int dims)
 #endif
     return dot;
 }
+

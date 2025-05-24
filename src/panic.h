@@ -43,4 +43,11 @@
             abort();                                \
         }                                           \
     } while (0)
+
+
+#define WARNING(module, msg) \
+	do {			 \
+		fprintf(stderr, "[%s] %s\n", module, msg); \
+	} while(0) 
+
 #endif

@@ -6,11 +6,10 @@
 #include "victor.h"
 #include "config.h"
 #include "panic.h"
-#include "index_nsw.h"
 
 #define DIMS 128
 #define TOP_N 10
-#define NUM_VECTORS 20000
+#define NUM_VECTORS 500000
 #define QUERY_COUNT 1000
 #define NOISE_LEVEL 0.2f
 

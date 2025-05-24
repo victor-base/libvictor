@@ -1,7 +1,7 @@
 # Makefile exclusivo de Windows.
 # - Para ejecutar el makefile: make -f .\Makefile.win
 # - Para limpiar: make -f .\Makefile.win clean
-# - Para generar el .exe: gcc test.o index.o index_flat.o math.o mem.o method.o vector.o iflat_utils.o heap.o time.o map.o index_nsw.o file.o store.o -o runtest.exe -L. -lvictor
+# - Para generar el .exe: gcc test.o index.o index_flat.o math.o mem.o method.o vector.o iflat_utils.o heap.o time.o map.o file.o store.o -o runtest.exe -L. -lvictor
 
 # Nombre de la librería (se generará .dll)
 LIB_NAME = libvictor.dll
@@ -10,10 +10,10 @@ LIB_NAME = libvictor.dll
 EXEC = runtest.exe
 
 # Archivos de cabecera (headers)
-HEADERS = config.h index.h mem.h map.h time.h index_flat.h index_nsw.h vector.h heap.h math.h panic.h method.h victor.h store.h graph.h file.h iflat_utils.h
+HEADERS = config.h index.h mem.h map.h time.h index_flat.h vector.h heap.h math.h panic.h method.h victor.h store.h graph.h file.h iflat_utils.h
 
 # Archivos fuente
-SRCS = index_hnsw.c test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c index_nsw.c file.c store.c asort.c graph.c error.c
+SRCS = index_hnsw.c test.c index.c index_flat.c math.c mem.c method.c vector.c iflat_utils.c heap.c time.c map.c file.c store.c asort.c graph.c error.c
 
 # Archivos objeto correspondientes
 OBJS = $(SRCS:.c=.o)

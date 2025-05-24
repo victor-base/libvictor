@@ -307,6 +307,30 @@ static int flat_remap(void *index, Map *map) {
     return SUCCESS;
 }
 
+static int flat_compare(void *index, const void *node, float32_t *vector, uint16_t dims, float32_t *distance) {
+	IndexFlat *idx = (IndexFlat *)index;
+	INodeFlat *n   = (INodeFlat *)node;
+	float32_t *f   = NULL;
+	int assigned = 0;
+	if (dims != idx->dims)
+		return INVALID_DIMENSIONS;
+
+	if (idx->dims_aligned > dims) {
+		f = aligned_calloc_mem(16, idx->dims_aligned);
+		memcpy(f, vector, dims);
+		assigned = 1;
+	} else {
+		f = vector;
+	}
+	
+	*distance = idx->cmp->compare_vectors(n->vector->vector, f, idx->dims_aligned);
+	if (assigned)
+		free_aligned_mem(f);
+	return SUCCESS;
+}
+
+__DEFINE_EXPORT_FN(flat_export, IndexFlat, INodeFlat)
+
 /*
  * flat_release - Releases all resources associated with a flat index.
  *
@@ -390,6 +414,44 @@ error_return:
     return NULL;
 }
 
+static int flat_import(void *idx, IOContext *io, Map *map, int mode) {
+	IndexFlat *index = (IndexFlat *) idx;
+	INodeFlat *node;
+
+	if (io->dims != index->dims || io->dims_aligned != index->dims_aligned)
+		return INVALID_DIMENSIONS;
+    
+    for (int i = 0; i < (int) io->elements; i++) {
+		if (map_has(map, io->vectors[i]->id)) {
+			switch (mode) {
+			
+			case IMPORT_OVERWITE:
+				PANIC_IF(map_get_safe_p(map, io->vectors[i]->id, (void **)&node) != MAP_SUCCESS, "failed to get existing node");
+                PANIC_IF(map_remove_p(map, io->vectors[i]->id) != MAP_SUCCESS, "failed to remove duplicate ID from map");
+                PANIC_IF(flat_delete(index, node) != SUCCESS, "failed to delete existing node");
+				node = NULL;
+				break;
+
+			case IMPORT_IGNORE_VERBOSE:
+				WARNING("import", "duplicated entry - ignore");
+				continue;
+			case IMPORT_IGNORE:
+			default:
+				continue;
+			}
+
+		}
+        node = calloc_mem(1, sizeof(INodeFlat));
+        if (node == NULL)
+            return SYSTEM_ERROR;
+        node->vector = io->vectors[i];
+        insert_node(&index->head, node);
+		if (map_insert_p(map, node->vector->id, node) != MAP_SUCCESS)
+            return SYSTEM_ERROR;
+    }
+    return SUCCESS;
+}
+
 /*-------------------------------------------------------------------------------------*
  *                                PUBLIC FUNCTIONS                                     *
  *-------------------------------------------------------------------------------------*/
@@ -410,6 +472,9 @@ error_return:
     idx->search_n = flat_search_n;
     idx->insert   = flat_insert;
     idx->dump     = flat_dump;
+	idx->export   = flat_export;
+	idx->import   = flat_import;
+	idx->compare  = flat_compare;
     idx->remap    = flat_remap;
     idx->delete   = flat_delete;
     idx->release  = flat_release;

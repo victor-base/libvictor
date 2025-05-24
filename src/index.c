@@ -44,14 +44,14 @@
 #define __LIB_CODE 1
 
 #include "index.h"
+#include "heap.h"
 #include "mem.h"
 #include "map.h"
 #include "vtime.h"
+#include "kmeans.h"
+#include "method.h"
 #include "index_flat.h"
 #include "index_hnsw.h"
-#include "index_nsw.h"
-
-
 
 
 /**
@@ -181,6 +181,87 @@ int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result) 
     }
     pthread_rwlock_unlock(&index->rwlock);
     return ret;
+}
+
+/**
+ * @brief Filters and ranks a subset of elements from an index based on similarity
+ *        to a query vector, returning the top-N closest matches.
+ *
+ * This function compares a given input vector against a subset of indexed elements
+ * identified by their IDs, using the configured comparison method in the index.
+ * It maintains a heap to efficiently track the top-N best matches according to the
+ * selected similarity or distance metric.
+ *
+ * Results are written into the provided `results` array, sorted from best to worst match.
+ * If fewer than N valid elements are found, the remaining entries are filled with
+ * default values (`id = 0`, and `distance = cmp->worst_match_value`).
+ *
+ * Thread-safe read access to the index is ensured via a shared read-lock.
+ *
+ * @param index    Pointer to the index containing elements and configuration.
+ * @param ids      Array of element IDs to compare against.
+ * @param i        Number of IDs in the `ids` array.
+ * @param vector   Pointer to the input vector to be compared.
+ * @param dims     Dimensionality of the input vector.
+ * @param results  Output array of `MatchResult` structures to store top-N matches.
+ * @param n        Maximum number of top matches to return.
+ *
+ * @return SUCCESS on success, or an appropriate error code on failure.
+ */
+int filter_subset(Index *index, uint64_t *ids, int i, float32_t *vector, uint16_t dims, MatchResult *results, int n) {
+	HeapNode e;
+	CmpMethod *cmp;
+	void *node;
+	Heap W;
+	int ret = SUCCESS;
+
+	if (index == NULL)   return INVALID_INDEX;
+    if (vector == NULL)  return INVALID_VECTOR;
+    if (results == NULL) return INVALID_RESULT;
+
+    if (index->data == NULL || index->compare == NULL)
+        return INVALID_INIT;
+
+	cmp = get_method(index->method);
+	if (!cmp)
+		return INVALID_INIT;
+
+	if (init_heap(&W, HEAP_WORST_TOP, n, cmp->is_better_match) != HEAP_SUCCESS)
+		return SYSTEM_ERROR;
+
+	pthread_rwlock_rdlock(&index->rwlock);
+	for (int j = 0; j < i; j++) {
+		float32_t distance;
+		
+		if (map_get_safe_p(&index->map, ids[j], &node) != MAP_SUCCESS) 
+			continue;
+
+		if ((ret = index->compare(index->data, node , vector, dims, &distance)) != SUCCESS) {
+			pthread_rwlock_unlock(&index->rwlock);
+			goto end;
+		}
+		e = HEAP_NODE_SET_U64(ids[j], distance);
+		PANIC_IF(heap_insert_or_replace_if_better(&W, &e) != HEAP_SUCCESS, "error in heap");
+	}
+	pthread_rwlock_unlock(&index->rwlock);
+	int heap_len = heap_size(&W);
+	int pos = 0;
+
+	while (pos < heap_len) {
+		PANIC_IF(heap_pop(&W, &e)!= HEAP_SUCCESS, "lack");
+		
+		results[heap_len - pos - 1].id = HEAP_NODE_U64(e);
+		results[heap_len - pos - 1].distance = e.distance;
+		pos++;
+	}
+
+	for (int j = heap_len; j < n; j++) {
+		results[j].id = 0;
+		results[j].distance = cmp->worst_match_value;
+	}
+end:
+	heap_destroy(&W);
+	return ret;
 }
 
 /*
@@ -453,6 +534,154 @@ int dump(Index *index, const char *filename) {
 }
 
 /*
+ * Export the current index state to a file on disk.
+ *
+ * This function serializes vectors.
+ * The resulting file can later be used to import vector in the index via a corresponding import operation.
+ *
+ * @param index - Pointer to the index instance.
+ * @param filename - Path to the output file where the index will be saved.
+ *
+ * @return SUCCESS on success,
+ *         INVALID_INDEX if the index is NULL,
+ *         NOT_IMPLEMENTED if the index type does not support dumping,
+ *         or SYSTEM_ERROR on I/O failure.
+ */
+int export(Index *index, const char *filename) {
+    IOContext io;
+    
+    int ret;
+    if (!index)
+        return INVALID_INDEX;
+    
+    if (index->export == NULL)
+        return NOT_IMPLEMENTED;
+
+    pthread_rwlock_rdlock(&index->rwlock);
+    ret = index->export(index->data, &io);
+    if (ret == SUCCESS)
+        ret = store_dump_file(filename, &io);
+    pthread_rwlock_unlock(&index->rwlock);
+    io_free(&io);
+    return ret;
+}
+
+/*
+ * Import vectors from a file and populate the index.
+ *
+ * This function reads a previously exported file (using `export`) and loads its
+ * contents into the current index instance, respecting the specified import mode.
+ *
+ * @param index - Pointer to the index instance where the vectors will be imported.
+ * @param filename - Path to the file containing the serialized vectors to import.
+ * @param mode - Import mode that determines how to handle duplicate IDs
+ *               (e.g., overwrite, ignore, etc.).
+ *
+ * @return SUCCESS on success,
+ *         INVALID_INDEX if the index is NULL,
+ *         NOT_IMPLEMENTED if the index type does not support import,
+ *         SYSTEM_ERROR on I/O failure or allocation error.
+ */
+int import(Index *index, const char *filename, int mode) {
+	IOContext io;
+	int ret;
+
+	if (!index)
+		return INVALID_INDEX;
+	if (index->import == NULL)
+		return NOT_IMPLEMENTED;
+
+	if ((ret = store_load_file(filename, &io)) != SUCCESS)
+		return ret;
+	
+	pthread_rwlock_wrlock(&index->rwlock);
+	ret = index->import(index->data, &io, &index->map, mode);
+	pthread_rwlock_unlock(&index->rwlock);
+	io_free(&io);
+	return ret;
+}
+
+/**
+ * @brief Generate a set of centroids for K-Means clustering from an existing index.
+ *
+ * This function takes an existing index (`from`) and performs a clustering algorithm (like K-Means++)
+ * to compute `nprobe` centroids, returning them as a new index structure containing only the centroids.
+ *
+ * @param from Pointer to the source Index structure containing the dataset.
+ * @param nprobe The number of centroids (clusters) to generate.
+ *
+ * @note The returned index is a flat structure containing only the centroid vectors.
+ * @note The IDs of the centroid vectors in the resulting index start from 1 up to `nprobe`.
+ * @note The caller is responsible for freeing the returned index with the appropriate destruction function (e.g., destroy_index()).
+ * @note If the input index is empty or if `nprobe` exceeds the number of available vectors, the function may return NULL.
+ *
+ * @return A pointer to the new Index containing the `nprobe` centroids, or NULL on failure.
+ */
+Index *kmeans_centroids(Index *from, int nprobe) {
+	Index *index = NULL;
+	KMContext *context  = NULL;
+	float32_t **dataset = NULL;
+	int dims_aligned;
+	IOContext io;
+	int ret;
+
+	if (!from || !from->data)
+		return NULL;
+	if (from->export == NULL || from->insert == NULL)
+		return NULL;
+
+	pthread_rwlock_rdlock(&from->rwlock);
+    ret = from->export(from->data, &io);
+	if (ret != SUCCESS) {
+		pthread_rwlock_unlock(&from->rwlock);
+		return NULL;
+	}
+
+	if ((int)io.elements <= nprobe) 
+		goto unlock_error_return;
+
+	dataset = raw_vectors(io.vectors, io.elements);
+	if (!dataset) 
+		goto unlock_error_return;
+
+
+	context = kmeans_create_context(nprobe, dataset, io.elements, io.dims_aligned, 0.001, 100);
+	if (!context)
+		goto unlock_error_return;
+
+	if (kmeans_pp_train(context) != SUCCESS) 
+		goto unlock_error_return;
+
+	dims_aligned = io.dims_aligned;
+	io_free(&io);
+	free_mem(dataset);
+	pthread_rwlock_unlock(&from->rwlock);
+	
+
+	index = alloc_index(FLAT_INDEX, L2NORM, dims_aligned, NULL);
+	if (index == NULL) {
+		kmeans_destroy_context(&context);
+		return NULL;
+	}
+
+	for (int i = 0; i < context->c; i++) 
+		if (insert(index, i+1, context->centroids[i], dims_aligned) != SUCCESS) {
+			destroy_index(&index);
+			break;
+		}
+	
+	kmeans_destroy_context(&context);
+	return index;
+
+unlock_error_return:
+	if (dataset) free_mem(dataset);
+	if (context) kmeans_destroy_context(&context);
+	io_free(&io);
+	pthread_rwlock_unlock(&from->rwlock);
+	return NULL;
+}
+
+/*
  * Destroys and deallocates an index.
  *
  * This function is responsible for safely releasing all resources associated
@@ -521,9 +750,6 @@ Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
     case FLAT_INDEX:
         ret = flat_index(idx, method, dims);
         break;
-    case NSW_INDEX:
-        ret = nsw_index(idx, method, dims, icontext);
-        break;
 
 	case HNSW_INDEX:
 		ret = hnsw_index(idx, method, dims, icontext);
@@ -537,7 +763,7 @@ Index *alloc_index(int type, int method, uint16_t dims, void *icontext) {
         goto error_return;
 
     pthread_rwlock_init(&idx->rwlock, NULL);
-
+	idx->method = method;
     return idx;
 
 error_return:
@@ -565,10 +791,6 @@ Index *load_index(const char *filename) {
     }
 
     switch (io.itype) {
-        case NSW_INDEX:
-            ret = nsw_index_load(idx, &io);
-            break;
-
         case FLAT_INDEX:
             ret = flat_index_load(idx, &io);
             break;
@@ -590,7 +812,8 @@ Index *load_index(const char *filename) {
     }
 
     pthread_rwlock_init(&idx->rwlock, NULL);
-
+	idx->method = io.method;
+	io_free(&io);
     return idx;
 
 error_return:

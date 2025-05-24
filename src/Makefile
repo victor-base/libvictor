@@ -22,7 +22,7 @@ else ifeq ($(OS), Darwin)
 endif
 
 # Sources and objects
-SRCS = index.c index_flat.c vmath.c mem.c method.c vector.c iflat_utils.c heap.c vtime.c map.c index_nsw.c store.c file.c asort.c graph.c index_hnsw.c error.c
+SRCS = index.c index_flat.c vmath.c mem.c method.c vector.c iflat_utils.c heap.c vtime.c map.c store.c file.c asort.c graph.c index_hnsw.c error.c kmeans.c
 OBJS = $(SRCS:.c=.o)
 
 LDFLAGS = -lm -lpthread

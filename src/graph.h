@@ -85,7 +85,7 @@ typedef struct {
     uint16_t  dims_aligned; /**< Aligned dimensionality (e.g., multiple of 4 for SIMD). */
     
     GraphNode *gentry;  /**< Global entry point to the top level of the graph. */
-    GraphNode *lentry;  /**< Local entry list used for traversal or deletion. */
+    GraphNode *head;  /**< Local entry list used for traversal or deletion. */
 } IndexHNSW;
 
 

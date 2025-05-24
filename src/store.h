@@ -27,12 +27,9 @@
 
 #define MAGIC_SZ size_t(uint32_t)
 
+#define VEC_MAGIC       0x464C5000
 /** @brief Magic value for Flat Index. */
 #define FLT_MAGIC       0x464C5449  /**< 'FLTI' */
-/** @brief Magic value for Flat Index Multi-Processing. */
-#define FLT_MP_MAGIC    0x464C544D  /**< 'FLTM' */
-/** @brief Magic value for Navigable Small World Index. */
-#define NSW_MAGIC       0x4E535747  /**< 'NSWG' */
 /** @brief Magic value for Hierarchical NSW Index. */
 #define HNSW_MAGIC      0x484E5357  /**< 'HNSW' */
 
@@ -86,6 +83,30 @@ typedef struct {
     void   **nodes;          /**< Pointer array to nodes. */
     Vector **vectors;        /**< Pointer array to vectors. */
 } IOContext;
+
+
+#define __DEFINE_EXPORT_FN(FUNC_NAME, IndexType, NodeType)               \
+static int FUNC_NAME(void *index, IOContext *io) {                       \
+    IndexType *idx = index;                                              \
+    NodeType   *entry = NULL;                                            \
+    if (io_init(io, idx->elements, 0, IO_INIT_VECTORS) != SUCCESS)       \
+        return SYSTEM_ERROR;                                             \
+    io->nsize = 0;                                                       \
+    io->vsize = VECTORSZ(idx->dims_aligned);                             \
+    io->dims = idx->dims;                                                \
+    io->dims_aligned = idx->dims_aligned;                                \
+    io->itype = VEC_MAGIC;                                               \
+    io->method = idx->cmp->type;                                         \
+    io->hsize  = 0;                                                      \
+    entry = idx->head;                                                   \
+    for (int i = 0; entry; entry = entry->next, i++) {                   \
+        PANIC_IF(i >= (int) io->elements, "index overflow while mapping entries"); \
+        io->vectors[i] = entry->vector;                                  \
+    }                                                                    \
+    return SUCCESS;                                                      \
+}
+
+
 
 /**
  * @brief Initializes an IOContext structure.

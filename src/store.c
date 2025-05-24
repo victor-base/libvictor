@@ -31,8 +31,8 @@
  */
 static uint32_t index_to_magic(int itype) {
     switch (itype) {
+		case VEC_MAGIC:      return VEC_MAGIC;
         case FLAT_INDEX:     return FLT_MAGIC;
-        case NSW_INDEX:      return NSW_MAGIC;
         case HNSW_INDEX:     return HNSW_MAGIC;
         default:             PANIC_IF(1==1, "invalid index type");
     }
@@ -46,8 +46,8 @@ static uint32_t index_to_magic(int itype) {
  */
 int magic_to_index(uint32_t magic) {
     switch (magic) {
+		case VEC_MAGIC:      return VEC_MAGIC;
         case FLT_MAGIC:      return FLAT_INDEX;
-        case NSW_MAGIC:      return NSW_INDEX;
         case HNSW_MAGIC:     return HNSW_INDEX;
         default:             return -1;  // desconocido
     }
@@ -339,4 +339,5 @@ error_return:
     io_free(io);
     return ret;
 }
+
 

@@ -84,16 +84,19 @@ GraphNode *alloc_graph_node(uint64_t id, float32_t *vector, uint16_t dims_aligne
     sz += (level + 1) * sizeof(GraphNode **);
     sz += (M0 + ((level) * M)) * sizeof(GraphNode *);
 
-    node = (GraphNode *)calloc(1, sz);
+    node = (GraphNode *)calloc_mem(1, sz);
     if (!node) 
         return NULL;
 
-    node->vector = make_vector(id, vector, dims_aligned);
-    if (!node->vector) {
-        free_mem(node);
-        return NULL;
-    }
-    
+	if (vector && id != NULL_ID) {
+		node->vector = make_vector(id, vector, dims_aligned);
+		if (!node->vector) {
+			free_mem(node);
+			return NULL;
+		}
+	} else {
+		node->vector = NULL;
+	}
     uint8_t *ptr = (uint8_t *)(node + 1);
 
     node->level = level;
@@ -666,14 +669,14 @@ int graph_insert(IndexHNSW *idx, GraphNode *node) {
     if (idx->elements == 0) {
         idx->elements = idx->elements + 1;
         idx->gentry = node;
-        idx->lentry = node;
+        idx->head = node;
         idx->top_level = node->level;
         return SUCCESS;
     }
     
     // Insert in the flat list
-    node->next = idx->lentry;
-    idx->lentry = node;
+    node->next = idx->head;
+    idx->head = node;
 
     // Fill Search Context
     sc.cmp = idx->cmp;
@@ -795,7 +798,7 @@ int graph_knn_search(IndexHNSW *idx, float32_t *vector, Heap *R, int k) {
     GraphNode *ep;
     Heap W = HEAP_INIT();
     HeapNode w;
-    int i, ret = SYSTEM_ERROR;
+    int i, ret = SYSTEM_ERROR, ef;
 
     PANIC_IF(heap_cap(R) != k, "incorrect space allocation in R");
 
@@ -817,7 +820,8 @@ int graph_knn_search(IndexHNSW *idx, float32_t *vector, Heap *R, int k) {
         ep = (GraphNode *) HEAP_NODE_PTR(w);
         heap_destroy(&W);
     }
-    if (search_layer(&sc, &ep,1, idx->ef_search, 0, &W) != SUCCESS)
+	ef = k > idx->ef_search ? k * 2 : idx->ef_search;
+    if (search_layer(&sc, &ep,1, ef, 0, &W) != SUCCESS)
         goto return_with_error;
 
     if (select_neighbors(&sc, &W, k, 0, 0) != SUCCESS)
@@ -836,3 +840,4 @@ return_with_error:
     heap_destroy(&W);
     return ret;
 }
+

@@ -52,6 +52,12 @@ typedef struct {
 
 #include <stdio.h>
 
+
+#define IMPORT_OVERWITE       0x00
+#define IMPORT_IGNORE_VERBOSE 0x01
+#define IMPORT_IGNORE         0x02
+
+
 #define PRINT_VECTOR(where,vec, dims)                              \
     do {                                                     \
         printf("%s [", (where));                                         \
@@ -102,7 +108,7 @@ extern const char *victor_strerror(ErrorCode code);
  * Constants for index types.
  */
 #define FLAT_INDEX    0x00  // Sequential flat index (single-threaded)
-#define NSW_INDEX     0x02  // Navigable Small World graph
+#define NSW_INDEX     0x03  // Navigable Small World graph
 #define HNSW_INDEX    0x03  // Hierarchical NSW (planned)
 
 /**
@@ -131,16 +137,6 @@ typedef struct {
     TimeStat search_n;   // Multi-search timing
 } IndexStats;
 
-/*
- * NSW Specific Struct
- */
-#define OD_PROGESIVE  0x00
-#define EF_AUTOTUNED  0x00
-typedef struct {
-    int ef_search;
-    int ef_construct;
-    int odegree;
-} NSWContext;
 
 #define HNSW_CONTEXT 0x01
 #define HNSW_CONTEXT_SET_EF_CONSTRUCT 1 << 2
@@ -183,6 +179,53 @@ extern int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *r
  * Wrapper for Index->insert.
  */
 extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
+
+
+/**
+ * @brief Filters and ranks a subset of elements from an index based on similarity
+ *        to a query vector, returning the top-N closest matches.
+ *
+ * This function compares a given input vector against a subset of indexed elements
+ * identified by their IDs, using the configured comparison method in the index.
+ * It maintains a heap to efficiently track the top-N best matches according to the
+ * selected similarity or distance metric.
+ *
+ * Results are written into the provided `results` array, sorted from best to worst match.
+ * If fewer than N valid elements are found, the remaining entries are filled with
+ * default values (`id = 0`, and `distance = cmp->worst_match_value`).
+ *
+ * Thread-safe read access to the index is ensured via a shared read-lock.
+ *
+ * @param index    Pointer to the index containing elements and configuration.
+ * @param ids      Array of element IDs to compare against.
+ * @param i        Number of IDs in the `ids` array.
+ * @param vector   Pointer to the input vector to be compared.
+ * @param dims     Dimensionality of the input vector.
+ * @param results  Output array of `MatchResult` structures to store top-N matches.
+ * @param n        Maximum number of top matches to return.
+ *
+ * @return SUCCESS on success, or an appropriate error code on failure.
+ */
+extern int filter_subset(Index *index, uint64_t *ids, int i, float32_t *vector, uint16_t dims, MatchResult *results, int n);
+
+/**
+ * @brief Generate a set of centroids for K-Means clustering from an existing index.
+ *
+ * This function takes an existing index (`from`) and performs a clustering algorithm (like K-Means++)
+ * to compute `nprobe` centroids, returning them as a new index structure containing only the centroids.
+ *
+ * @param from Pointer to the source Index structure containing the dataset.
+ * @param nprobe The number of centroids (clusters) to generate.
+ *
+ * @note The returned index is a flat structure containing only the centroid vectors.
+ * @note The IDs of the centroid vectors in the resulting index start from 1 up to `nprobe`.
+ * @note The caller is responsible for freeing the returned index with the appropriate destruction function (e.g., destroy_index()).
+ * @note If the input index is empty or if `nprobe` exceeds the number of available vectors, the function may return NULL.
+ *
+ * @return A pointer to the new Index containing the `nprobe` centroids, or NULL on failure.
+ */
+extern Index *kmeans_centroids(Index *from, int nprobe);
+
 
 /**
  * Deletes a vector from the index by ID.
@@ -243,6 +286,39 @@ extern int size(Index *index, uint64_t *sz);
  */
 extern int dump(Index *index, const char *filename);
 
+/**
+ * Import vectors from a file and populate the index.
+ *
+ * This function reads a previously exported file (using `export`) and loads its
+ * contents into the current index instance, respecting the specified import mode.
+ *
+ * @param index - Pointer to the index instance where the vectors will be imported.
+ * @param filename - Path to the file containing the serialized vectors to import.
+ * @param mode - Import mode that determines how to handle duplicate IDs
+ *               (e.g., overwrite, ignore, etc.).
+ *
+ * @return SUCCESS on success,
+ *         INVALID_INDEX if the index is NULL,
+ *         NOT_IMPLEMENTED if the index type does not support import,
+ *         SYSTEM_ERROR on I/O failure or allocation error.
+ */
+extern int import(Index *index, const char *filename, int mode);
+
+/** 
+ * Export the current index state to a file on disk.
+ *
+ * This function serializes vectors.
+ * The resulting file can later be used to import vector in the index via a corresponding import operation.
+ *
+ * @param index - Pointer to the index instance.
+ * @param filename - Path to the output file where the index will be saved.
+ *
+ * @return SUCCESS on success,
+ *         INVALID_INDEX if the index is NULL,
+ *         NOT_IMPLEMENTED if the index type does not support dumping,
+ *         or SYSTEM_ERROR on I/O failure.
+ */
+extern int export(Index *index, const char *filename);
 
 /**
  * Checks whether a given vector ID exists in the index.

@@ -72,7 +72,7 @@
 typedef struct Index {
     char *name;        // Name of the indexing method (e.g., "Flat", "HNSW")
     void *data;        // Pointer to the specific index data structure
-
+	int  method;
     IndexStats stats;  // Accumulated timing statistics for operations
 
     Map map;           // ID-to-node hash map used by all index types
@@ -109,11 +109,35 @@ typedef struct Index {
      * @param ref Optional output pointer to store the internal reference.
      * @return 0 if successful, or -1 on error.
      */
-    int (*insert)(void *, uint64_t, float32_t *, uint16_t, void **ref);
+    int (*insert)(void *data, uint64_t id, float32_t *vector, uint16_t dims, void **ref);
 
-	int (*update_icontext)(void *, void *, int);
+	/**
+     * Updates the internal context of the index.
+     * @param data The specific index data structure.
+     * @param context The new context or configuration to apply.
+     * @param type The type of update to perform.
+     * @return SUCCESS on success, or an error code on failure.
+     */
+	int (*update_icontext)(void *data, void *context, int type);
 
-    int (*remap)(void *, Map *);
+	/**
+     * Remaps the internal structure of the index using a new map.
+     * @param data The specific index data structure.
+     * @param map The new map to use for remapping.
+     * @return SUCCESS on success, or an error code on failure.
+     */
+    int (*remap)(void *data, Map *map);
+
+	/**
+     * Compares a vector with a node in the index.
+     * @param data The specific index data structure.
+     * @param node The node to compare.
+     * @param vector The input vector.
+     * @param dimd The number of dimensions.
+     * @param distance Output pointer to store the computed distance.
+     * @return SUCCESS on success, or an error code on failure.
+     */
+	int (*compare)(void *data, const void *node, float32_t *vector, uint16_t dims, float32_t *distance);
 
     /**
      * Deletes a vector from the index using its ID.
@@ -136,7 +160,11 @@ typedef struct Index {
      * @param filename Path to the file where the index should be dumped.
      * @return 0 if successful, or -1 on error.
      */
-    int (*dump)(void *, IOContext *);
+    int (*dump)(void *data, IOContext *io);
+
+	int (*export)(void *data, IOContext *io);
+
+	int (*import)(void *data, IOContext *io, Map *map, int mode);
 
     /**
      * Releases internal resources allocated by the index (if any).
