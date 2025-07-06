@@ -22,7 +22,7 @@ else ifeq ($(OS), Darwin)
 endif
 
 # Sources and objects
-SRCS = index.c index_flat.c vmath.c mem.c method.c vector.c iflat_utils.c heap.c vtime.c map.c store.c file.c asort.c graph.c index_hnsw.c error.c kmeans.c
+SRCS = index.c index_flat.c vmath.c mem.c method.c vector.c iflat_utils.c heap.c vtime.c map.c store.c file.c asort.c graph.c index_hnsw.c error.c kmeans.c kvtable.c
 OBJS = $(SRCS:.c=.o)
 
 LDFLAGS = -lm -lpthread
@@ -61,7 +61,7 @@ clean:
 # Install to system directories
 install:
 	mkdir -p /usr/local/include/victor
-	cp victor.h victor.hpp /usr/local/include/victor/
+	cp victor.h victor.hpp victorkv.h /usr/local/include/victor/
 	$(INSTALL_LIB)
 
 .PHONY: all clean install

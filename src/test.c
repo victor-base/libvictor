@@ -25,7 +25,7 @@ void print_index_stats(const IndexStats *stats) {
     for (int i = 0; i < 5; i++) {
         const TimeStat *s = all_stats[i];
         double avg = (s->count > 0) ? s->total / s->count : 0.0;
-        printf("%-9s count = %-8lu total = %9.3f ms    avg = %7.3f ms    min = %7.3f ms    max = %7.3f ms\n",
+        printf("%-9s count = %-8llu total = %9.3f ms    avg = %7.3f ms    min = %7.3f ms    max = %7.3f ms\n",
                labels[i], s->count, s->total, avg, s->min, s->max);
     }
 }
@@ -73,7 +73,7 @@ int load_fvecs_file(const char *filename, float **vectors, int max_vectors, int 
             return -1;
         }
 
-        if (fread(vectors[i], sizeof(float), dims, f) != dims) {
+        if (fread(vectors[i], sizeof(float), dims, f) != (unsigned long)dims) {
             fprintf(stderr, "Error leyendo vector %d\n", i);
             fclose(f);
             return -1;

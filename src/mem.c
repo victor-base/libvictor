@@ -30,8 +30,66 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
- 
- /**
+
+
+/**
+  * Allocates memory for an array of `__count` elements of `__size` bytes each.
+  * This function abstracts `calloc` to allow for future optimizations.
+  */
+void *global_calloc_mem(size_t __count, size_t __size) {
+    return calloc(__count, __size);
+}
+
+void global_free_mem(void *__mem) {
+	free(__mem);
+}
+
+#ifdef __USE_THREAD_MEM
+#include <mimalloc.h>
+
+// Thread-local heap (one per thread)
+__thread mi_heap_t *thread_heap = NULL;
+
+// Ensure the thread-local heap is initialized
+static void ensure_heap() {
+    if (!thread_heap)
+        thread_heap = mi_heap_new();
+}
+
+void *calloc_mem(size_t count, size_t size) {
+    ensure_heap();
+    return mi_heap_calloc(thread_heap, count, size);
+}
+
+void *realloc_mem(void *ptr, size_t size) {
+	ensure_heap();
+    return mi_heap_realloc(ptr, size);
+}
+
+void free_mem(void *ptr) {
+    mi_free(ptr);
+}
+
+void *aligned_calloc_mem(size_t alignment, size_t size) {
+    ensure_heap();
+    void *ptr = mi_heap_malloc_aligned(thread_heap, size, alignment);
+    if (ptr) memset(ptr, 0, size);
+    return ptr;
+}
+
+void free_aligned_mem(void *ptr) {
+    mi_free(ptr); // same as normal
+}
+
+void destroy_thread_heap() {
+    if (thread_heap) {
+        mi_heap_destroy(thread_heap);
+        thread_heap = NULL;
+    }
+}
+#else
+
+/**
   * Allocates memory for an array of `__count` elements of `__size` bytes each.
   * This function abstracts `calloc` to allow for future optimizations.
   */
@@ -101,3 +159,5 @@ void free_aligned_mem(void *ptr) {
     free(ptr);
 #endif
 }
+
+#endif

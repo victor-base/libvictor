@@ -32,23 +32,33 @@ typedef struct ASort {
 	Heap *heap;
 } ASort;
 
-int init_asort(ASort *as, int n, int method) {
+int init_asort(ASort **as, int n, int method) {
 	CmpMethod *cmp;
-
 	if (as == NULL) 
 		return INVALID_ARGUMENT;
-	
-	cmp = get_method(method);
-	if (!cmp) 
-		return INVALID_METHOD;
 
-	as->heap = calloc_mem(1, sizeof(Heap));
-	if (!as->heap) 
+	*as = calloc_mem(1, sizeof(ASort));
+	if (!*as) 
 		return SYSTEM_ERROR;
 
-	if (init_heap(as->heap, HEAP_WORST_TOP, n, cmp->is_better_match) != HEAP_SUCCESS) {
-		free_mem(as->heap);
-		as->heap = NULL;
+	cmp = get_method(method);
+	if (!cmp) {
+		free_mem(*as);
+		*as = NULL;
+		return INVALID_METHOD;
+	}
+
+	(*as)->heap = calloc_mem(1, sizeof(Heap));
+	if (!(*as)->heap) {
+		free_mem(*as);
+		*as = NULL;
+		return SYSTEM_ERROR;
+	}
+	if (init_heap((*as)->heap, HEAP_WORST_TOP, n, cmp->is_better_match) != HEAP_SUCCESS) {
+		free_mem((*as)->heap);
+		(*as)->heap = NULL;
+		free_mem(*as);
+		*as = NULL;
 		return SYSTEM_ERROR;
 	}
 	return SUCCESS;
@@ -103,26 +113,30 @@ int as_update(ASort *as, MatchResult *inputs, int n) {
  * @param[in] n Maximum number of results to extract.
  * @return Number of results extracted on success, 0 if only freed, or an error code on failure.
  */
-int as_close(ASort *as, MatchResult *outputs, int n) {
+int as_close(ASort **as, MatchResult *outputs, int n) {
 	int k;
-	if (as == NULL || as->heap == NULL || n < 0)
+	if (as == NULL || *as == NULL || (*as)->heap == NULL || n < 0)
 		return -1;
 	
 	if (outputs == NULL) {
-		heap_destroy(as->heap);
-		as->heap = NULL;
+		heap_destroy((*as)->heap);
+		(*as)->heap = NULL;
+		free_mem(*as);
+		*as = NULL;
 		return 0;
 	}
 
-	k = n > as->heap->e ? as->heap->e : n;
+	k = n > (*as)->heap->e ? (*as)->heap->e : n;
 	for (int i = k -1; i >= 0; i--) {
 		HeapNode node;
-		if (heap_pop(as->heap, &node) == HEAP_ERROR_EMPTY)
+		if (heap_pop((*as)->heap, &node) == HEAP_ERROR_EMPTY)
 			return -1;
 		outputs[i].distance = node.distance;
 		outputs[i].id = HEAP_NODE_U64(node);
 	}
-	heap_destroy(as->heap);
-    as->heap = NULL;
+	heap_destroy((*as)->heap);
+    (*as)->heap = NULL;
+	free_mem(*as);
+	*as = NULL;
     return k;
 }

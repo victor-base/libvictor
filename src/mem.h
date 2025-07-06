@@ -39,4 +39,7 @@ extern void *aligned_calloc_mem(size_t alignment, size_t size);
 
 extern void free_aligned_mem(void *ptr);
 
+extern void *global_calloc_mem(size_t __count, size_t __size);
+
+extern void global_free_mem(void *__mem);
 #endif

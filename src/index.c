@@ -774,6 +774,19 @@ error_return:
     return NULL;
 }
 
+int safe_alloc_index(Index **index, int type, int method, uint16_t dims, void *icontext) {
+	if (dims == 0)
+		return INVALID_DIMENSIONS;
+	if (get_method(method) == NULL) 
+		return INVALID_METHOD;
+	if (type == FLAT_INDEX || type == HNSW_INDEX ) {
+		*index = alloc_index(type, method, dims, icontext);
+		if (!*index)
+			return SYSTEM_ERROR;
+	}
+	return SUCCESS;
+}
+
 Index *load_index(const char *filename) {
     Index *idx = NULL; 
     IOContext io;

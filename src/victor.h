@@ -76,6 +76,7 @@ typedef enum {
     INVALID_INIT,
     INVALID_INDEX,
     INVALID_VECTOR,
+	INVALID_INDEX_TYPE,
     INVALID_RESULT,
     INVALID_DIMENSIONS,
     INVALID_ARGUMENT,
@@ -90,7 +91,8 @@ typedef enum {
     FILEIO_ERROR,
     NOT_IMPLEMENTED,
     INVALID_FILE,
-} ErrorCode;
+} IndexErrorCode;
+
 
 /**
  * victor_strerror - Returns a human-readable error message for an ErrorCode.
@@ -102,7 +104,7 @@ typedef enum {
  *
  * @return A constant string with the error description.
  */
-extern const char *victor_strerror(ErrorCode code);
+extern const char *index_strerror(IndexErrorCode code);
 
 /**
  * Constants for index types.
@@ -341,6 +343,7 @@ extern int contains(Index *index, uint64_t id);
  * @return A pointer to the newly allocated index, or NULL on failure.
  */
 extern Index *alloc_index(int type, int method, uint16_t dims, void *icontext);
+extern int safe_alloc_index(Index **index, int type, int method, uint16_t dims, void *icontext);
 
 /**
  * Return index name
@@ -380,7 +383,7 @@ typedef struct ASort ASort;
  * @param[in] method Matching method identifier for comparison.
  * @return SUCCESS on success, or an error code on failure.
  */
-extern int init_asort(ASort *as, int n, int method);
+extern int init_asort(ASort **as, int n, int method);
 
 /**
  * @brief Adds multiple match results into the ASort structure.
@@ -406,7 +409,7 @@ extern int as_update(ASort *as, MatchResult *inputs, int n);
  * @param[in] n Maximum number of results to extract.
  * @return Number of results extracted on success, 0 if only freed, or an error code on failure.
  */
-extern int as_close(ASort *as, MatchResult *outputs, int n);
+extern int as_close(ASort **as, MatchResult *outputs, int n);
 
 
 #endif //* __VICTOR_H */
