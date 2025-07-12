@@ -10,10 +10,12 @@ typedef enum {
 	KV_ERROR_SYSTEM,
 	KV_ERROR_INVALID_TABLE,
 	KV_ERROR_INVALID_KEY,
-	KV_ERROR_INVALID_VALUE
+	KV_ERROR_INVALID_VALUE,
+	KV_ERROR_FILEIO,
+	KV_ERROR_FILE_INVALID
 } TableErrorCode;
 
-typedef struct kvTable kvTable;
+typedef struct KVTable KVTable;
 
 extern const char *table_strerror(TableErrorCode code);
 
@@ -22,13 +24,13 @@ extern const char *table_strerror(TableErrorCode code);
  *
  * This function creates a new key-value table with the specified name.
  * It allocates all necessary internal structures and prepares the table
- * for use. The returned pointer must be released with destroy_kvTable()
+ * for use. The returned pointer must be released with destroy_KVTable()
  * when no longer needed.
  *
  * @param name Optional name for the table (can be NULL).
- * @return Pointer to the newly allocated kvTable, or NULL on failure.
+ * @return Pointer to the newly allocated KVTable, or NULL on failure.
  */
-extern kvTable *alloc_kvtable(const char *name);
+extern KVTable *alloc_kvtable(const char *name);
 
 /**
  * @brief Destroys a key-value table and releases all associated resources.
@@ -37,22 +39,22 @@ extern kvTable *alloc_kvtable(const char *name);
  * entries and internal structures. After calling this function, the pointer to
  * the table will be set to NULL to avoid dangling references.
  *
- * @param kvTable Pointer to the kvTable pointer to destroy.
+ * @param KVTable Pointer to the KVTable pointer to destroy.
  */
-extern void destroy_kvtable(kvTable **kvTable);
+extern void destroy_kvtable(KVTable **KVTable);
 
 /**
  * @brief Inserts or updates a key-value pair in the hash map.
  *
  * This function inserts a new entry or updates an existing one in the hash map represented
- * by `kvTable`. If the key already exists, the value is updated in-place (reallocating memory
+ * by `KVTable`. If the key already exists, the value is updated in-place (reallocating memory
  * if necessary). If the key does not exist, a new node is created and inserted into the corresponding
  * bucket based on the key's hash.
  *
  * The function also performs rehashing if the load factor exceeds the configured threshold,
  * and ensures thread-safety using a write lock.
  *
- * @param table Pointer to the hash map (kvTable).
+ * @param table Pointer to the hash map (KVTable).
  * @param key Pointer to the key to insert.
  * @param klen Length of the key in bytes.
  * @param value Pointer to the value to insert.
@@ -72,7 +74,7 @@ extern void destroy_kvtable(kvTable **kvTable);
  * @note The function must be called with valid memory for key and value; it does not duplicate
  *       or validate the content beyond size and NULL checks.
  */
-extern int kv_put(kvTable *c, void *key, int klen, void *value, int vlen);
+extern int kv_put(KVTable *c, void *key, int klen, void *value, int vlen);
 
 /**
  * @brief Retrieves the value associated with a given key from the hash map.
@@ -83,7 +85,7 @@ extern int kv_put(kvTable *c, void *key, int klen, void *value, int vlen);
  *
  * Thread-safety is ensured by acquiring a read lock during the lookup.
  *
- * @param table Pointer to the hash map (kvTable).
+ * @param table Pointer to the hash map (KVTable).
  * @param key Pointer to the key to look up.
  * @param klen Length of the key in bytes.
  * @param value Output pointer to the value's memory location within the entry buffer.
@@ -98,7 +100,7 @@ extern int kv_put(kvTable *c, void *key, int klen, void *value, int vlen);
  * @note The value returned via `*value` is a pointer to internal memory; the caller must not free it.
  * @note The function does not copy the value; it only provides direct access to the internal storage.
  */
-extern int kv_get(kvTable *c, void *key, int klen, void **value, int *vlen);
+extern int kv_get(KVTable *c, void *key, int klen, void **value, int *vlen);
 
 /**
  * @brief Retrieves a copy of the value associated with a given key from the hash map.
@@ -109,7 +111,7 @@ extern int kv_get(kvTable *c, void *key, int klen, void **value, int *vlen);
  *
  * Thread-safety is ensured by acquiring a read lock during the lookup.
  *
- * @param table Pointer to the hash map (kvTable).
+ * @param table Pointer to the hash map (KVTable).
  * @param key Pointer to the key to look up.
  * @param klen Length of the key in bytes.
  * @param value Output pointer to a newly allocated buffer containing the value.
@@ -125,7 +127,7 @@ extern int kv_get(kvTable *c, void *key, int klen, void **value, int *vlen);
  * @note The value returned via `*value` must be freed by the caller using free_mem().
  * @note The function copies the value, so the caller receives an independent buffer.
  */
-extern int kv_get_copy(kvTable *table, void *key, int klen,void **value, int *vlen);
+extern int kv_get_copy(KVTable *table, void *key, int klen,void **value, int *vlen);
 
 /**
  * @brief Deletes a key-value pair from the hash map.
@@ -136,7 +138,7 @@ extern int kv_get_copy(kvTable *table, void *key, int klen,void **value, int *vl
  *
  * Thread-safety is ensured by acquiring a write lock during the deletion process.
  *
- * @param table Pointer to the hash map (kvTable).
+ * @param table Pointer to the hash map (KVTable).
  * @param key Pointer to the key to delete.
  * @param klen Length of the key in bytes.
  *
@@ -148,7 +150,7 @@ extern int kv_get_copy(kvTable *table, void *key, int klen,void **value, int *vl
  * @note The function will release all memory associated with the removed entry.
  * @note It is safe to call this function while other threads are performing reads.
  */
-extern int kv_del(kvTable *table, void *key, int klen);
-extern int kv_dump(kvTable *table, const char *filename);
-extern kvTable *load_kvtable(const char *filename);
+extern int kv_del(KVTable *table, void *key, int klen);
+extern int kv_dump(KVTable *table, const char *filename);
+extern KVTable *load_kvtable(const char *filename);
 #endif

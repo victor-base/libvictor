@@ -9,167 +9,256 @@
 #include "mem.h"
 
 
-#define DEFAULT_LOAD_FACTOR 15
+#define DEFAULT_LOAD_FACTOR  15
 #define DEFAULT_INIT_SIZE   100
 #define MAX_NAME_LEN        150
-
+#define MAGIC_HEADER 0x4B565354
 /**
  * @brief Header structure stored at the beginning of the dump file.
  */
 #pragma pack(push, 1)
 typedef struct {
-    uint32_t magic;         /**< File format identifier. */
-    uint8_t  major;         /**< Major version. */
-    uint8_t  minor;         /**< Minor version. */
-    uint8_t  patch;         /**< Patch version. */
-	uint8_t  _res[5];
-	uint32_t elements;
-} kv_store_header_t;
+    uint32_t magic;
+    uint8_t  major;
+    uint8_t  minor;
+    uint8_t  patch;
+    uint8_t  _res[5];
+    uint32_t elements;
+} KVStoreHeader;
 
 typedef struct {
-	uint64_t entry_offset;
-	uint64_t entry_size;
-} kv_store_entry_t;
+    uint64_t entry_offset;
+    uint64_t entry_size;
+} KVStoreEntry;
 
 typedef struct {
-    uint64_t hash;     
-    uint32_t klen;     
+    uint64_t hash;
+    uint32_t klen;
     uint32_t vlen;
     uint8_t  buff[];
-} kvEntry;
+} KVEntry;
 #pragma pack(pop)
 
-typedef struct kv_node {
-	kvEntry *entry;
-	struct kv_node *next;
-	struct kv_node *prev;
-} kvNode;
+typedef struct KVNode {
+    KVEntry *entry;
+    struct KVNode *next;
+    struct KVNode *prev;
+} KVNode;
 
 typedef struct {
-	int elements;
-	kv_store_entry_t *io_entry_index;
-	kvEntry **io_entry;
-} kv_io_t;
+    int elements;
+    KVStoreEntry *entry_index;
+    KVEntry **entries;
+} KVIO;
+
+typedef struct KVTable {
+    char name[MAX_NAME_LEN];
+    pthread_rwlock_t rwlock;
+    uint16_t rehash;
+    uint16_t lfactor_thrhold;
+    uint32_t mapsize;
+    uint64_t elements;
+    KVNode **map;
+} KVTable;
+
+
 
 /**
- * Structure representing the hash map.
- * Includes configuration for load factor threshold, total map size,
- * number of elements currently inserted, and the map buckets.
+ * @brief Dumps key-value data from a KVIO structure to a file.
+ *
+ * This function writes all key-value entries from a KVIO structure to a file in a 
+ * structured format. It first writes a header containing metadata about the store,
+ * then writes the entry index containing offset and size information for each entry,
+ * and finally writes the actual key-value data. The resulting file can be loaded
+ * back using kv_store_io_load().
+ *
+ * @param io Pointer to the KVIO structure containing the data to dump.
+ * @param file Pointer to the IOFile to write to.
+ *
+ * @return 0 on success.
+ *         KV_ERROR_FILEIO if any file write operation fails.
+ *
+ * @note The function writes data in binary format with specific magic numbers
+ *       for format identification and validation.
+ * @note All entries must be properly initialized in the KVIO structure before calling.
  */
-typedef struct kvTable {
-	char name[MAX_NAME_LEN];
-
-	pthread_rwlock_t rwlock; // Read-write lock for thread-safe access
-
-	uint16_t rehash;              // Rehahes
-	uint16_t lfactor_thrhold;     // Load factor threshold for triggering rehash
-    uint32_t mapsize;             // Total number of buckets
-	
-    uint64_t elements;            // Total number of elements stored
-    kvNode   **map;               // Array of buckets
-} kvTable;
-
-
-
-static int kv_store_io_dump(kv_io_t *io, IOFile *file) {
+static int kv_store_io_dump(KVIO *io, IOFile *file) {
 	PANIC_IF(io == NULL, "invalid io pointer");
 	PANIC_IF(file == NULL, "invalid file");
-	kv_store_header_t header;
 	int i;
 
-	// Escribir reader
+	KVStoreHeader header = {
+		.magic = MAGIC_HEADER, // 'KVST'
+		.major = 1,
+		.minor = 0,
+		.patch = 0,
+		.elements = io->elements
+	};
 
-	if (file_write(&header, sizeof(kv_store_header_t), 1, file) != 1)
-		return -1;
+	if (file_write(&header, sizeof(KVStoreHeader), 1, file) != 1)
+		return KV_ERROR_FILEIO;
 
 	for (i = 0; i < io->elements; i++)
-		if (file_write(&io->io_entry_index[i], sizeof(kv_store_entry_t), 1, file) != 1)
-			return -1;
+		if (file_write(&io->entry_index[i], sizeof(KVStoreEntry), 1, file) != 1)
+			return KV_ERROR_FILEIO;
 	for (i = 0; i < io->elements; i++) {
-		if (file_write(io->io_entry[i], io->io_entry_index[i].entry_size, 1, file) != 1)
-			return -1;
+		if (file_write(io->entries[i], io->entry_index[i].entry_size, 1, file) != 1)
+			return KV_ERROR_FILEIO;
 	}
 	return 0;
 }
 
-static int kvio_init(kv_io_t *io, int elements) {
+/**
+ * @brief Initializes a KVIO structure for storing key-value entries.
+ *
+ * This function allocates and initializes all necessary arrays within a KVIO structure
+ * to accommodate the specified number of key-value entries. It allocates memory for
+ * the entry index array and the entries pointer array, setting up the structure for
+ * subsequent loading or dumping operations.
+ *
+ * @param io Pointer to the KVIO structure to initialize.
+ * @param elements Number of key-value entries the structure should accommodate.
+ *
+ * @return KV_SUCCESS (0) on successful initialization.
+ *         KV_ERROR_SYSTEM if memory allocation fails.
+ *
+ * @note The function zeros out the entire KVIO structure before initialization.
+ * @note If allocation fails, any partially allocated memory is automatically freed.
+ * @note The elements parameter must be greater than 0.
+ */
+static int kvio_init(KVIO *io, int elements) {
 	PANIC_IF(io == NULL, "invalid io pointer");
 	PANIC_IF(elements <= 0, "invalid number of elements");
 
-	memset(io, 0, sizeof(kv_io_t));
+	memset(io, 0, sizeof(KVIO));
 	io->elements = elements;
-	io->io_entry_index = (kv_store_entry_t *)calloc_mem(elements, sizeof(kv_store_entry_t));
-	if (!io->io_entry_index)
-		return -1;
-	io->io_entry = (kvEntry **)calloc_mem(elements, sizeof(kvEntry *));
-	if (!io->io_entry) {
-		free_mem(io->io_entry_index);
-		return -1;
+	io->entry_index = (KVStoreEntry *)calloc_mem(elements, sizeof(KVStoreEntry));
+	if (!io->entry_index)
+		return KV_ERROR_SYSTEM;
+	io->entries = (KVEntry **)calloc_mem(elements, sizeof(KVEntry *));
+	if (!io->entries) {
+		free_mem(io->entry_index);
+		return KV_ERROR_SYSTEM;
 	}
-	return 0;
+	return KV_SUCCESS;
 }
 
-static void kvio_free(kv_io_t **io) {
-	if (!io || !*io)
+/**
+ * @brief Releases all memory allocated for a KVIO structure.
+ *
+ * This function frees all dynamically allocated memory associated with a KVIO structure,
+ * including the entry index array and the entries array. It safely handles NULL pointers
+ * and can be called multiple times on the same structure without issues.
+ *
+ * @param io Pointer to the KVIO structure to free (can be NULL).
+ *
+ * @note This function does not free the individual entries themselves, only the arrays
+ *       that hold pointers to them.
+ * @note After calling this function, the KVIO structure should be considered invalid.
+ */
+static void kvio_free(KVIO *io) {
+	if (!io)
 		return;
-	if((*io)->io_entry)
-		free_mem((*io)->io_entry);
-	if ((*io)->io_entry_index)
-		free_mem((*io)->io_entry_index);
-	*io = NULL;
+	if (io->entries)
+		free_mem(io->entries);
+	if (io->entry_index)
+		free_mem(io->entry_index);
 }
 
-static int kv_store_io_load(kv_io_t *io, IOFile *file) {
+/**
+ * @brief Loads key-value data from a file into a KVIO structure.
+ *
+ * This function reads a previously saved key-value store from a file and reconstructs
+ * the KVIO structure with all its entries. It first reads and validates the file header,
+ * then reads the entry index, and finally loads all the key-value entries into memory.
+ * The function performs integrity checks to ensure the file format is valid and the
+ * data is consistent.
+ *
+ * @param io Pointer to the KVIO structure to populate with loaded data.
+ * @param file Pointer to the IOFile to read from.
+ *
+ * @return KV_SUCCESS (0) on successful load.
+ *         KV_ERROR_FILEIO if file read operations fail.
+ *         KV_ERROR_FILE_INVALID if the file format is invalid or corrupted.
+ *         KV_ERROR_SYSTEM if memory allocation fails.
+ *
+ * @note The function automatically cleans up partially loaded data on failure.
+ * @note The file must have been created with kv_store_io_dump() for compatibility.
+ */
+static int kv_store_io_load(KVIO *io, IOFile *file) {
 	PANIC_IF(io == NULL, "invalid io pointer");
 	PANIC_IF(file == NULL, "invalid file");
-	kv_store_header_t header;
+	KVStoreHeader header;
 	uint64_t offset;
-	int i;
+	int ret, i;
 
-	if (file_read(&header, sizeof(kv_store_header_t), 1, file) != 1)
-		return -1;
+	if (file_read(&header, sizeof(KVStoreHeader), 1, file) != 1)
+		return KV_ERROR_FILEIO;
 
-	if (kvio_init(io, header.elements) != 0)
-		return -1;
-
-	if (file_read(io->io_entry_index, 
-				sizeof(kv_store_entry_t), 
-				header.elements,file) != header.elements) {
-		kvio_free(&io);
-		return -1;
+	if (header.magic != MAGIC_HEADER) {
+		return KV_ERROR_FILE_INVALID;
 	}
 
-	offset = sizeof(kv_store_header_t) + header.elements * sizeof(kv_store_entry_t);
-	if (offset != io->io_entry_index[0].entry_offset || 
+	if ((ret = kvio_init(io, header.elements)) != KV_SUCCESS)
+		return ret;
+
+	if (file_read(io->entry_index, 
+				sizeof(KVStoreEntry), 
+				header.elements,file) != header.elements) {
+		kvio_free(io);
+		return KV_ERROR_FILEIO;
+	}
+
+	offset = sizeof(KVStoreHeader) + header.elements * sizeof(KVStoreEntry);
+	if (offset != io->entry_index[0].entry_offset || 
 	   (uint64_t)offset != (uint64_t)file_tello(file)) {
-		kvio_free(&io);
-		return -1;
+		kvio_free(io);
+		return KV_ERROR_FILE_INVALID;
 	}
 
 	for (i = 0; i < (int)header.elements; i++) {
-		PANIC_IF(io->io_entry_index[i].entry_size == 0, "invalid entry size");
-		io->io_entry[i] = (kvEntry *)calloc_mem(1, io->io_entry_index[i].entry_size);
-		if (!io->io_entry[i]) {
+		PANIC_IF(io->entry_index[i].entry_size == 0, "invalid entry size");
+		io->entries[i] = (KVEntry *)calloc_mem(1, io->entry_index[i].entry_size);
+		if (!io->entries[i]) {
 			i = i - 1;
+			ret = KV_ERROR_SYSTEM;
 			goto error_cleanup;
 		}
-		if (file_read(io->io_entry[i], io->io_entry_index[i].entry_size, 1, file) != 1)
+		if (file_read(io->entries[i], io->entry_index[i].entry_size, 1, file) != 1) {
+			ret = KV_ERROR_FILEIO;
 			goto error_cleanup;
+		}
 	}
-	return 0;
+	return KV_SUCCESS;
 error_cleanup:
 	for (; i >= 0; i--)
-		free_mem(io->io_entry[i]);
-	kvio_free(&io);
-	return -1;
+		free_mem(io->entries[i]);
+	kvio_free(io);
+	return ret;
 }
 
-static kvNode *get_node(kvTable *table, void *key, int klen) {
+/**
+ * @brief Searches for a node in the hash table based on the given key.
+ *
+ * This function performs a hash-based lookup to find a node that matches the provided key.
+ * It computes the hash of the key, determines the appropriate bucket, and then traverses
+ * the linked list in that bucket to find a node with matching hash, key length, and key content.
+ *
+ * @param table Pointer to the hash table (KVTable).
+ * @param key Pointer to the key to search for.
+ * @param klen Length of the key in bytes.
+ *
+ * @return Pointer to the matching KVNode if found, NULL otherwise.
+ *
+ * @note This function does not acquire any locks; the caller is responsible for thread safety.
+ * @note The function performs a full key comparison using memcmp for collision resolution.
+ */
+static KVNode *get_node(KVTable *table, void *key, int klen) {
 	if (!table || !key || klen < 0)
 		return NULL;
 	uint64_t hash = XXH64(key, klen, 0);
 	int bucket = hash % table->mapsize;
-	kvNode *node = table->map[bucket];
+	KVNode *node = table->map[bucket];
 	while (node) {
 		if (hash == node->entry->hash && 
 			(uint32_t)klen == node->entry->klen && 
@@ -189,7 +278,7 @@ static kvNode *get_node(kvTable *table, void *key, int klen) {
  *
  * Thread-safety is ensured by acquiring a read lock during the lookup.
  *
- * @param table Pointer to the hash map (kvTable).
+ * @param table Pointer to the hash map (KVTable).
  * @param key Pointer to the key to look up.
  * @param klen Length of the key in bytes.
  * @param value Output pointer to the value's memory location within the entry buffer.
@@ -204,7 +293,7 @@ static kvNode *get_node(kvTable *table, void *key, int klen) {
  * @note The value returned via `*value` is a pointer to internal memory; the caller must not free it.
  * @note The function does not copy the value; it only provides direct access to the internal storage.
  */
-int kv_get(kvTable *table, void *key, int klen, void **value, int *vlen) {
+int kv_get(KVTable *table, void *key, int klen, void **value, int *vlen) {
 	if (!table) 
 		return KV_ERROR_INVALID_TABLE;
 	if (!key || klen <= 0)
@@ -213,7 +302,7 @@ int kv_get(kvTable *table, void *key, int klen, void **value, int *vlen) {
 		return KV_ERROR_INVALID_VALUE;
 
 	pthread_rwlock_rdlock(&table->rwlock);
-	kvNode *node = get_node(table, key, klen);
+	KVNode *node = get_node(table, key, klen);
 	pthread_rwlock_unlock(&table->rwlock);
 	if (node) {
 		*value = &node->entry->buff[node->entry->klen];
@@ -232,7 +321,7 @@ int kv_get(kvTable *table, void *key, int klen, void **value, int *vlen) {
  *
  * Thread-safety is ensured by acquiring a read lock during the lookup.
  *
- * @param table Pointer to the hash map (kvTable).
+ * @param table Pointer to the hash map (KVTable).
  * @param key Pointer to the key to look up.
  * @param klen Length of the key in bytes.
  * @param value Output pointer to a newly allocated buffer containing the value.
@@ -248,7 +337,7 @@ int kv_get(kvTable *table, void *key, int klen, void **value, int *vlen) {
  * @note The value returned via `*value` must be freed by the caller using free_mem().
  * @note The function copies the value, so the caller receives an independent buffer.
  */
-int kv_get_copy(kvTable *table, void *key, int klen,void **value, int *vlen) {
+int kv_get_copy(KVTable *table, void *key, int klen,void **value, int *vlen) {
 	if (!table) 
 		return KV_ERROR_INVALID_TABLE;
 	if (!key || klen <= 0)
@@ -257,7 +346,7 @@ int kv_get_copy(kvTable *table, void *key, int klen,void **value, int *vlen) {
 		return KV_ERROR_INVALID_VALUE;
 
 	pthread_rwlock_rdlock(&table->rwlock);
-	kvNode *node = get_node(table, key, klen);
+	KVNode *node = get_node(table, key, klen);
 	if (node) {
 		*value = global_calloc_mem(1, node->entry->vlen);
 		if (!*value) {
@@ -285,7 +374,7 @@ int kv_get_copy(kvTable *table, void *key, int klen,void **value, int *vlen) {
  *
  * Thread-safety is ensured by acquiring a write lock during the deletion process.
  *
- * @param table Pointer to the hash map (kvTable).
+ * @param table Pointer to the hash map (KVTable).
  * @param key Pointer to the key to delete.
  * @param klen Length of the key in bytes.
  *
@@ -297,14 +386,14 @@ int kv_get_copy(kvTable *table, void *key, int klen,void **value, int *vlen) {
  * @note The function will release all memory associated with the removed entry.
  * @note It is safe to call this function while other threads are performing reads.
  */
-int kv_del(kvTable *table, void *key, int klen) {
+int kv_del(KVTable *table, void *key, int klen) {
     if (!table)
 		return KV_ERROR_INVALID_TABLE;
 	if (!key || klen <= 0)
         return KV_ERROR_INVALID_KEY;
 
 	pthread_rwlock_wrlock(&table->rwlock);
-    kvNode *node = get_node(table, key, klen);
+    KVNode *node = get_node(table, key, klen);
     if (!node) {
 		pthread_rwlock_unlock(&table->rwlock);
 		return KV_KEY_NOT_FOUND;
@@ -338,7 +427,7 @@ int kv_del(kvTable *table, void *key, int klen) {
  * threshold, in order to maintain efficient access times. The hash of each entry is reused
  * to compute the new bucket table modulo the new size.
  *
- * @param table Pointer to the hash map structure (`kvTable`).
+ * @param table Pointer to the hash map structure (`KVTable`).
  * @param nsize New size of the hash map (must be greater than current size).
  *
  * @note This function assumes that the caller has acquired a write lock (`rwlock`)
@@ -350,17 +439,17 @@ int kv_del(kvTable *table, void *key, int klen) {
  * @warning The original map is freed and replaced with the new one. All internal node pointers
  *          are adjusted accordingly. This function does not modify the number of elements.
  */
-static int rehash(kvTable *table, uint32_t nsize) {
+static int rehash(KVTable *table, uint32_t nsize) {
 	int bucket;
 	PANIC_IF(table == NULL, "invalid table parameter");
 	PANIC_IF(nsize == 0 || nsize < table->mapsize, "invalid size parameter");
 
-	kvNode **tmp = (kvNode **) calloc_mem(nsize, sizeof(kvNode*));
+	KVNode **tmp = (KVNode **) calloc_mem(nsize, sizeof(KVNode*));
 	if (!tmp)
 		return KV_ERROR_SYSTEM;
 
 	for (uint32_t i = 0; i < table->mapsize; ++i) {
-		kvNode *ptr;
+		KVNode *ptr;
 		while (table->map[i]) {
 			ptr = table->map[i];
 			table->map[i] = ptr->next;
@@ -385,14 +474,14 @@ static int rehash(kvTable *table, uint32_t nsize) {
  * @brief Inserts or updates a key-value pair in the hash map.
  *
  * This function inserts a new entry or updates an existing one in the hash map represented
- * by `kvTable`. If the key already exists, the value is updated in-place (reallocating memory
+ * by `KVTable`. If the key already exists, the value is updated in-place (reallocating memory
  * if necessary). If the key does not exist, a new node is created and inserted into the corresponding
  * bucket based on the key's hash.
  *
  * The function also performs rehashing if the load factor exceeds the configured threshold,
  * and ensures thread-safety using a write lock.
  *
- * @param table Pointer to the hash map (kvTable).
+ * @param table Pointer to the hash map (KVTable).
  * @param key Pointer to the key to insert.
  * @param klen Length of the key in bytes.
  * @param value Pointer to the value to insert.
@@ -412,9 +501,9 @@ static int rehash(kvTable *table, uint32_t nsize) {
  * @note The function must be called with valid memory for key and value; it does not duplicate
  *       or validate the content beyond size and NULL checks.
  */
-int kv_put(kvTable *table, void *key, int klen, void *value, int vlen) {
-	kvEntry *tmp;
-	kvNode *node;
+int kv_put(KVTable *table, void *key, int klen, void *value, int vlen) {
+	KVEntry *tmp;
+	KVNode *node;
 	int bucket;
 	if (!table)
 		return KV_ERROR_INVALID_TABLE;
@@ -436,7 +525,7 @@ int kv_put(kvTable *table, void *key, int klen, void *value, int vlen) {
 	node = get_node(table, key, klen);
 	if (node) {
 		if (node->entry->vlen < (uint32_t)vlen) {
-			tmp = (kvEntry *) realloc_mem(node->entry, sizeof(kvEntry) + klen + vlen);
+			tmp = (KVEntry *) realloc_mem(node->entry, sizeof(KVEntry) + klen + vlen);
 			if (!tmp) {
 				pthread_rwlock_unlock(&table->rwlock);
 				return KV_ERROR_SYSTEM;
@@ -448,7 +537,7 @@ int kv_put(kvTable *table, void *key, int klen, void *value, int vlen) {
 		pthread_rwlock_unlock(&table->rwlock);
 		return KV_SUCCESS;
 	}
-	tmp = (kvEntry *) calloc_mem(1, sizeof(kvEntry) + klen + vlen);
+	tmp = (KVEntry *) calloc_mem(1, sizeof(KVEntry) + klen + vlen);
 	if (!tmp) {
 		pthread_rwlock_unlock(&table->rwlock);
 		return KV_ERROR_SYSTEM;
@@ -459,7 +548,7 @@ int kv_put(kvTable *table, void *key, int klen, void *value, int vlen) {
 	memcpy(tmp->buff, key, klen);
 	memcpy(&tmp->buff[klen], value, vlen);
 
-	node = (kvNode *) calloc_mem(1, sizeof(kvNode));
+	node = (KVNode *) calloc_mem(1, sizeof(KVNode));
 	if (!node) {
 		free_mem(tmp);
 		pthread_rwlock_unlock(&table->rwlock);
@@ -486,20 +575,20 @@ int kv_put(kvTable *table, void *key, int klen, void *value, int vlen) {
  * when no longer needed.
  *
  * @param name Optional name for the table (can be NULL).
- * @return Pointer to the newly allocated kvTable, or NULL on failure.
+ * @return Pointer to the newly allocated KVTable, or NULL on failure.
  */
-static kvTable *alloc_kv_table_base(const char *name, int size, int loadfactor) {
+static KVTable *alloc_kv_table_base(const char *name, int size, int loadfactor) {
 	if (strlen(name) > MAX_NAME_LEN)
 		return NULL;
 
-	kvTable *idx = (kvTable *) calloc_mem(1, sizeof(kvTable));
+	KVTable *idx = (KVTable *) calloc_mem(1, sizeof(KVTable));
 	if (!idx) 
 		return NULL;
 
 	strcpy(idx->name, name);
 	
-
-	idx->map = (kvNode **) calloc_mem(size, sizeof(kvNode*));
+	pthread_rwlock_init(&idx->rwlock, NULL);
+	idx->map = (KVNode **) calloc_mem(size, sizeof(KVNode*));
 	if (!idx->map) {
 		free_mem(idx);
 		return NULL;
@@ -513,8 +602,70 @@ static kvTable *alloc_kv_table_base(const char *name, int size, int loadfactor) 
 	return idx;
 }
 
-kvTable *alloc_kvtable(const char *name) {
+KVTable *alloc_kvtable(const char *name) {
 	return alloc_kv_table_base(name, DEFAULT_INIT_SIZE, DEFAULT_LOAD_FACTOR);
+}
+
+int kv_dump(KVTable *table, const char *filename);
+
+
+/**
+ * @brief Load a key-value table from a binary file.
+ *
+ * This function reads a serialized key-value store from disk using the `kv_store_io_load` function,
+ * reconstructs the internal structure into a `KVTable`, and returns a pointer to the newly created table.
+ *
+ * The data is read into a temporary `KVIO` structure and then transferred into a new `KVTable` 
+ * by allocating and inserting each `KVNode` into the appropriate hash bucket based on the stored hash value.
+ *
+ * @param filename The path to the binary file containing the serialized key-value store.
+ *
+ * @return A pointer to the loaded `KVTable` on success, or `NULL` if an error occurs during file reading,
+ *         memory allocation, or table construction.
+ *
+ * @note The returned `KVTable` must be destroyed with `destroy_kvtable()` when no longer needed to avoid memory leaks.
+ */
+KVTable *load_kvtable(const char *filename) {
+	KVTable *table;
+	KVNode  *node;
+	IOFile  *file;
+	KVIO io;
+	
+	file = file_open(filename, "rb");
+	if (!file) 
+		return NULL;
+
+	if (kv_store_io_load(&io, file) != KV_SUCCESS) {
+		file_close(file);
+		return NULL;
+	}
+
+	file_close(file);
+	table = alloc_kv_table_base("table-loaded", 2 * io.elements, DEFAULT_LOAD_FACTOR);
+	if (!table) {
+		kvio_free(&io);
+		return NULL;
+	}
+
+	for ( int i = 0; i < io.elements; i ++ ) {
+		int bucket;
+		node = (KVNode *) calloc_mem(1, sizeof(KVNode));
+		if (!node) {
+			destroy_kvtable(&table);
+			kvio_free(&io);
+			return NULL;
+		}
+		node->entry = io.entries[i];
+		bucket = node->entry->hash % table->mapsize;
+		node->next = table->map[bucket];
+		node->prev = NULL;
+		if (node->next)
+			node->next->prev = node;
+		table->map[bucket] = node;
+		table->elements++;
+	}
+	kvio_free(&io);
+	return table;
 }
 
 /**
@@ -524,10 +675,10 @@ kvTable *alloc_kvtable(const char *name) {
  * entries and internal structures. After calling this function, the pointer to
  * the table will be set to NULL to avoid dangling references.
  *
- * @param kvTable Pointer to the kvTable pointer to destroy.
+ * @param KVTable Pointer to the KVTable pointer to destroy.
  */
-void destroy_kvtable(kvTable **table) {
-    kvNode *node;
+void destroy_kvtable(KVTable **table) {
+    KVNode *node;
 	if (!table || !*table || !(*table)->map)
         return;
 
