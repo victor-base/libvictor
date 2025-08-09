@@ -45,6 +45,7 @@ const char *table_strerror(TableErrorCode code) {
         case KV_ERROR_INVALID_VALUE: return "Invalid or malformed value.";
 		case KV_ERROR_FILEIO:		 return "System-level IO error.";
 		case KV_ERROR_FILE_INVALID:  return "Invalid or malformed file structure.";
+		case KV_ERROR_MISMATCH_ELEMENT_COUNT: return "mismatch in expected vs actual elements ";
         default:                     return "Unknown table error code.";
     }
 }

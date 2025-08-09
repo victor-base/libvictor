@@ -39,6 +39,7 @@ typedef struct {
 } KVEntry;
 #pragma pack(pop)
 
+
 typedef struct KVNode {
     KVEntry *entry;
     struct KVNode *next;
@@ -61,7 +62,66 @@ typedef struct KVTable {
     KVNode **map;
 } KVTable;
 
+void kv_unsafe_lock(KVTable *table) {
+	pthread_rwlock_rdlock(&table->rwlock);
+}
 
+void kv_unsafe_unlock(KVTable *table) {
+	pthread_rwlock_unlock(&table->rwlock);
+}
+
+/**
+ * @brief Scans the table for keys that match a given prefix pattern.
+ *
+ * This function searches through all entries in the hash table and returns
+ * those whose keys start with the specified prefix pattern. The scan is
+ * performed without acquiring locks (unsafe), so the caller must ensure
+ * proper synchronization.
+ *
+ * @param table Pointer to the KVTable to scan.
+ * @param ilike Pointer to the prefix pattern to match against.
+ * @param ilen Length of the prefix pattern in bytes.
+ * @param results Array of KVResult structures to populate (allocated by caller).
+ * @param rlen Maximum number of results that can be stored in the results array.
+ *
+ * @return Number of results found (>= 0) on success.
+ *         KV_ERROR_INVALID_TABLE if table is NULL.
+ *         KV_ERROR_INVALID_KEY if ilike is NULL or ilen is invalid.
+ *         KV_ERROR_INVALID_VALUE if results is NULL or rlen is invalid.
+ *
+ * @note This function does not acquire any locks - caller must ensure thread safety.
+ * @note The function performs prefix matching, not exact key matching.
+ * @note The caller only needs to allocate the array of structures, not individual pointers.
+ * @note The returned key and value pointers point to internal memory - do not free.
+ */
+int kv_unsafe_prefix_scan(KVTable *table, void *ilike, int ilen, KVResult *results, int rlen) {
+    int i, r = 0;
+    KVNode *node;
+    
+    if (!table) 
+        return KV_ERROR_INVALID_TABLE;
+    if (!ilike || ilen <= 0)
+        return KV_ERROR_INVALID_KEY;
+    if (!results || rlen <= 0)
+        return KV_ERROR_INVALID_VALUE;
+
+    for (i = 0; i < (int)table->mapsize && r < rlen; i++) {
+        node = table->map[i];
+        while (node && r < rlen) {
+            if (node->entry && 
+                (uint32_t)ilen <= node->entry->klen && 
+                !memcmp(ilike, node->entry->buff, ilen)) {
+                results[r].key   = node->entry->buff;
+                results[r].value = &node->entry->buff[node->entry->klen];
+                results[r].klen  = node->entry->klen;
+                results[r].vlen  = node->entry->vlen;
+                r++;
+            }
+            node = node->next;
+        }
+    }
+    return r;
+}
 
 /**
  * @brief Dumps key-value data from a KVIO structure to a file.
@@ -606,7 +666,73 @@ KVTable *alloc_kvtable(const char *name) {
 	return alloc_kv_table_base(name, DEFAULT_INIT_SIZE, DEFAULT_LOAD_FACTOR);
 }
 
-int kv_dump(KVTable *table, const char *filename);
+/**
+ * @brief Dump the contents of a KVTable to a file.
+ *
+ * This function serializes the key-value entries stored in a hash table (`KVTable`)
+ * and writes them to a binary file in a compact format. It generates a header with
+ * versioning information and an index of all entries, followed by the serialized entries.
+ *
+ * @param table Pointer to the KVTable to be dumped. The table must be write-locked
+ *              internally to avoid concurrent modifications during serialization.
+ * @param filename Name of the output file to store the serialized table contents.
+ *
+ * @return KV_SUCCESS on success. Returns a negative error code on failure:
+ *         - KV_ERROR_MISMATCH_ELEMENT_COUNT if the counted entries do not match the expected total.
+ *         - KV_ERROR_FILEIO if the file could not be opened or written.
+ *         - Other errors may be propagated from `kvio_init()` or `kv_store_io_dump()`.
+ *
+ * @note The function uses a write lock on the table to ensure thread-safety.
+ * @note The caller must ensure the file system is writable and that `filename` is valid.
+ */
+int kv_dump(KVTable *table, const char *filename) {
+	uint64_t base_offset;
+	KVNode *node = NULL;
+	IOFile *file = NULL;
+	KVIO io;
+	int ret = KV_SUCCESS, i, e;
+	
+	
+	pthread_rwlock_wrlock(&table->rwlock);
+
+	if ((ret = kvio_init(&io, table->elements)) != KV_SUCCESS) {
+		pthread_rwlock_unlock(&table->rwlock);
+		return ret;
+	}
+	
+	base_offset = sizeof(KVStoreHeader) + table->elements * sizeof(KVStoreEntry);
+	e = 0;
+	for ( i = 0; i < (int)table->mapsize; i ++ ) {
+		node = table->map[i];
+		while (node) {
+			if (node->entry) {
+				io.entry_index[e].entry_size   = sizeof(KVEntry) + node->entry->klen + node->entry->vlen;
+				io.entry_index[e].entry_offset = base_offset;
+				io.entries[e] = node->entry;
+				base_offset += io.entry_index[e].entry_size;
+				e++;
+			}
+			node = node->next;
+		}
+	}
+	if ( e != (int) table->elements ) {
+		ret = KV_ERROR_MISMATCH_ELEMENT_COUNT;
+		goto cleanup;
+	}
+	io.elements = e;
+
+	file = file_open(filename, "wb");
+	if (!file) {
+		ret = KV_ERROR_FILEIO;
+		goto cleanup;
+	}
+	ret = kv_store_io_dump(&io, file);
+	file_close(file);
+cleanup:
+	pthread_rwlock_unlock(&table->rwlock);
+	kvio_free(&io);
+	return ret;
+}
 
 
 /**

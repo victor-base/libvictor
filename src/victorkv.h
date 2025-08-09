@@ -12,12 +12,27 @@ typedef enum {
 	KV_ERROR_INVALID_KEY,
 	KV_ERROR_INVALID_VALUE,
 	KV_ERROR_FILEIO,
-	KV_ERROR_FILE_INVALID
+	KV_ERROR_FILE_INVALID,
+	KV_ERROR_MISMATCH_ELEMENT_COUNT
 } TableErrorCode;
 
 typedef struct KVTable KVTable;
 
+typedef struct {
+    void *key;
+	void *value;
+	int klen;
+	int vlen;
+} KVResult;
+
 extern const char *table_strerror(TableErrorCode code);
+
+extern void kv_unsafe_lock(KVTable *table);
+
+
+extern void kv_unsafe_unlock(KVTable *table);
+
+
 
 /**
  * @brief Allocates and initializes a new key-value table (hash map).
@@ -101,6 +116,32 @@ extern int kv_put(KVTable *c, void *key, int klen, void *value, int vlen);
  * @note The function does not copy the value; it only provides direct access to the internal storage.
  */
 extern int kv_get(KVTable *c, void *key, int klen, void **value, int *vlen);
+
+/**
+ * @brief Scans the table for keys that match a given prefix pattern.
+ *
+ * This function searches through all entries in the hash table and returns
+ * those whose keys start with the specified prefix pattern. The scan is
+ * performed without acquiring locks (unsafe), so the caller must ensure
+ * proper synchronization.
+ *
+ * @param table Pointer to the KVTable to scan.
+ * @param ilike Pointer to the prefix pattern to match against.
+ * @param ilen Length of the prefix pattern in bytes.
+ * @param results Array of KVResult structures to populate (allocated by caller).
+ * @param rlen Maximum number of results that can be stored in the results array.
+ *
+ * @return Number of results found (>= 0) on success.
+ *         KV_ERROR_INVALID_TABLE if table is NULL.
+ *         KV_ERROR_INVALID_KEY if ilike is NULL or ilen is invalid.
+ *         KV_ERROR_INVALID_VALUE if results is NULL or rlen is invalid.
+ *
+ * @note This function does not acquire any locks - caller must ensure thread safety.
+ * @note The function performs prefix matching, not exact key matching.
+ * @note The caller only needs to allocate the array of structures, not individual pointers.
+ * @note The returned key and value pointers point to internal memory - do not free.
+ */
+extern int kv_unsafe_prefix_scan(KVTable *table, void *ilike, int ilen, KVResult *results, int rlen);
 
 /**
  * @brief Retrieves a copy of the value associated with a given key from the hash map.

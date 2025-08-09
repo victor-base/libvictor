@@ -125,7 +125,7 @@ float32_t norm(float32_t *v, int dims) {
 #elif defined(__SSE__)
 	__m128 acc_norm = _mm_setzero_ps();
 	for (int i = 0; i < dims; i += 4) {
-		__m128 a = _mm_loadu_ps(v + i); // más seguro si no tenés garantía de alineamiento
+		__m128 a = _mm_loadu_ps(v + i);
 		acc_norm = _mm_add_ps(acc_norm, _mm_mul_ps(a, a));
 	}
 	__m128 shuf = _mm_movehdup_ps(acc_norm);
