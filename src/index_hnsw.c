@@ -121,7 +121,7 @@ static int hnsw_import(void *index, IOContext *io, Map *map, int mode) {
 
 			case IMPORT_OVERWITE:
 				PANIC_IF(map_get_safe_p(map, io->vectors[i]->id, (void **)&node) != MAP_SUCCESS, "failed to get existing node");
-                PANIC_IF(map_remove_p(map, io->vectors[i]->id) != MAP_SUCCESS, "failed to remove duplicate ID from map");
+                PANIC_IF(map_remove_p(map, io->vectors[i]->id) == NULL, "failed to remove duplicate ID from map");
                 PANIC_IF(hnsw_delete(index, node) != SUCCESS, "failed to delete existing node");
 				node = NULL;
 				break;
