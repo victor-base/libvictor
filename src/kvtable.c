@@ -825,3 +825,12 @@ void destroy_kvtable(KVTable **table) {
 	free_mem(*table);
 	*table = NULL;
 }
+
+int kv_size(KVTable *table, uint64_t *sz) {
+    if (!table)
+        return KV_ERROR_INVALID_TABLE;
+    pthread_rwlock_rdlock(&table->rwlock);
+    *sz = table->elements;
+    pthread_rwlock_unlock(&table->rwlock);
+    return KV_SUCCESS;
+}

@@ -32,7 +32,7 @@ extern void kv_unsafe_lock(KVTable *table);
 
 extern void kv_unsafe_unlock(KVTable *table);
 
-
+extern int kv_size(KVTable *table, uint64_t *sz);
 
 /**
  * @brief Allocates and initializes a new key-value table (hash map).
