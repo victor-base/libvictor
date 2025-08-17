@@ -3,7 +3,7 @@ OS := $(shell uname -s 2>/dev/null || echo Windows_NT)
 ARCH := $(shell uname -m)
 
 # Version info
-VERSION = 1.0.0
+VERSION = 1.0.17
 SOVERSION = 1
 
 # Configs based on OS

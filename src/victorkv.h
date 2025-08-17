@@ -25,13 +25,65 @@ typedef struct {
 	int vlen;
 } KVResult;
 
+/**
+ * @brief Returns a human-readable error message for a TableErrorCode.
+ *
+ * This function maps each error code to a descriptive string suitable
+ * for logs, stderr, or user-facing error messages.
+ *
+ * @param code The TableErrorCode value.
+ *
+ * @return A constant string with the error description.
+ */
 extern const char *table_strerror(TableErrorCode code);
 
+/**
+ * @brief Acquires a write lock on the table without any safety checks.
+ *
+ * This function directly acquires the internal write lock of the table
+ * without performing any validation. It should only be used in scenarios
+ * where you need manual lock control and are certain the table is valid.
+ *
+ * @param table Pointer to the KVTable to lock.
+ *
+ * @warning This is an unsafe operation - no validation is performed.
+ * @warning Must be paired with kv_unsafe_unlock() to avoid deadlocks.
+ * @warning The caller is responsible for ensuring the table pointer is valid.
+ */
 extern void kv_unsafe_lock(KVTable *table);
 
-
+/**
+ * @brief Releases a write lock on the table without any safety checks.
+ *
+ * This function directly releases the internal write lock of the table
+ * without performing any validation. It should only be used to unlock
+ * a table that was previously locked with kv_unsafe_lock().
+ *
+ * @param table Pointer to the KVTable to unlock.
+ *
+ * @warning This is an unsafe operation - no validation is performed.
+ * @warning Should only be called after a successful kv_unsafe_lock().
+ * @warning The caller is responsible for ensuring the table pointer is valid.
+ */
 extern void kv_unsafe_unlock(KVTable *table);
 
+/**
+ * @brief Retrieves the current number of elements in the key-value table.
+ *
+ * This function returns the total count of key-value pairs currently
+ * stored in the table. The operation is thread-safe and uses a read lock
+ * to ensure consistency during concurrent access.
+ *
+ * @param table Pointer to the KVTable to query.
+ * @param sz Pointer to a uint64_t variable to store the size.
+ *
+ * @return KV_SUCCESS on success.
+ *         KV_ERROR_INVALID_TABLE if table is NULL.
+ *         KV_ERROR_INVALID_VALUE if sz is NULL.
+ *
+ * @note The size reflects the current state and may change immediately
+ *       after the function returns in a multi-threaded environment.
+ */
 extern int kv_size(KVTable *table, uint64_t *sz);
 
 /**
@@ -192,6 +244,41 @@ extern int kv_get_copy(KVTable *table, void *key, int klen,void **value, int *vl
  * @note It is safe to call this function while other threads are performing reads.
  */
 extern int kv_del(KVTable *table, void *key, int klen);
+
+/**
+ * @brief Dumps the entire contents of a key-value table to a file.
+ *
+ * This function serializes all key-value pairs in the table and writes
+ * them to a binary file. The file format is specific to this library
+ * and can be later loaded using load_kvtable().
+ *
+ * @param table Pointer to the KVTable to dump.
+ * @param filename Path to the output file where the table will be saved.
+ *
+ * @return KV_SUCCESS on successful dump.
+ *         KV_ERROR_INVALID_TABLE if table is NULL.
+ *         KV_ERROR_FILEIO if filename is NULL or file operations fail.
+ *         KV_ERROR_SYSTEM if memory allocation or other system errors occur.
+ *
+ * @note The output file will be overwritten if it exists.
+ * @note The function uses a read lock to ensure data consistency during dump.
+ */
 extern int kv_dump(KVTable *table, const char *filename);
+
+/**
+ * @brief Loads a key-value table from a previously dumped file.
+ *
+ * This function reads a binary file created by kv_dump() and reconstructs
+ * the key-value table with all its entries. The returned table is fully
+ * functional and ready for use.
+ *
+ * @param filename Path to the input file containing the serialized table.
+ *
+ * @return Pointer to the newly loaded KVTable on success, or NULL on failure.
+ *
+ * @note The caller is responsible for destroying the returned table with destroy_kvtable().
+ * @note The file must have been created by kv_dump() from this library version.
+ * @note Returns NULL if the file doesn't exist, is corrupted, or incompatible.
+ */
 extern KVTable *load_kvtable(const char *filename);
 #endif

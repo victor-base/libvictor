@@ -62,10 +62,36 @@ typedef struct KVTable {
     KVNode **map;
 } KVTable;
 
+/**
+ * @brief Acquires a read lock on the table without any safety checks.
+ *
+ * This function directly acquires the internal read lock of the table
+ * without performing any validation. It should only be used in scenarios
+ * where you need manual lock control and are certain the table is valid.
+ *
+ * @param table Pointer to the KVTable to lock.
+ *
+ * @warning This is an unsafe operation - no validation is performed.
+ * @warning Must be paired with kv_unsafe_unlock() to avoid deadlocks.
+ * @warning The caller is responsible for ensuring the table pointer is valid.
+ */
 void kv_unsafe_lock(KVTable *table) {
 	pthread_rwlock_rdlock(&table->rwlock);
 }
 
+/**
+ * @brief Releases a read lock on the table without any safety checks.
+ *
+ * This function directly releases the internal read lock of the table
+ * without performing any validation. It should only be used to unlock
+ * a table that was previously locked with kv_unsafe_lock().
+ *
+ * @param table Pointer to the KVTable to unlock.
+ *
+ * @warning This is an unsafe operation - no validation is performed.
+ * @warning Should only be called after a successful kv_unsafe_lock().
+ * @warning The caller is responsible for ensuring the table pointer is valid.
+ */
 void kv_unsafe_unlock(KVTable *table) {
 	pthread_rwlock_unlock(&table->rwlock);
 }
@@ -627,15 +653,22 @@ int kv_put(KVTable *table, void *key, int klen, void *value, int vlen) {
 }
 
 /**
- * @brief Allocates and initializes a new key-value table (hash map).
+ * @brief Allocates and initializes a new key-value table with custom parameters.
  *
- * This function creates a new key-value table with the specified name.
- * It allocates all necessary internal structures and prepares the table
- * for use. The returned pointer must be released with destroy_kv_table()
- * when no longer needed.
+ * This function creates a new key-value table with the specified name, initial size,
+ * and load factor threshold. It allocates all necessary internal structures including
+ * the hash bucket array and initializes the read-write lock for thread safety.
+ * The returned pointer must be released with destroy_kvtable() when no longer needed.
  *
- * @param name Optional name for the table (can be NULL).
- * @return Pointer to the newly allocated KVTable, or NULL on failure.
+ * @param name Name for the table (must not exceed MAX_NAME_LEN characters).
+ * @param size Initial size of the hash table (number of buckets).
+ * @param loadfactor Load factor threshold that triggers rehashing when exceeded.
+ *
+ * @return Pointer to the newly allocated KVTable on success, or NULL on failure.
+ *
+ * @note This is an internal function used by alloc_kvtable() and load_kvtable().
+ * @note The function will fail if name is longer than MAX_NAME_LEN or memory allocation fails.
+ * @note The table starts with zero elements and will grow dynamically as needed.
  */
 static KVTable *alloc_kv_table_base(const char *name, int size, int loadfactor) {
 	if (strlen(name) > MAX_NAME_LEN)
@@ -826,6 +859,23 @@ void destroy_kvtable(KVTable **table) {
 	*table = NULL;
 }
 
+/**
+ * @brief Retrieves the current number of elements in the key-value table.
+ *
+ * This function returns the total count of key-value pairs currently
+ * stored in the table. The operation is thread-safe and uses a read lock
+ * to ensure consistency during concurrent access.
+ *
+ * @param table Pointer to the KVTable to query.
+ * @param sz Pointer to a uint64_t variable to store the size.
+ *
+ * @return KV_SUCCESS on success.
+ *         KV_ERROR_INVALID_TABLE if table is NULL.
+ *
+ * @note The size reflects the current state and may change immediately
+ *       after the function returns in a multi-threaded environment.
+ * @note The sz parameter is validated internally - if NULL, undefined behavior may occur.
+ */
 int kv_size(KVTable *table, uint64_t *sz) {
     if (!table)
         return KV_ERROR_INVALID_TABLE;
