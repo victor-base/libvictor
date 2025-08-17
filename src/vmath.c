@@ -116,30 +116,37 @@ int euclidean_distance_best(float32_t a, float32_t b)
 
 float32_t norm(float32_t *v, int dims) {
 #ifdef __ARM_NEON
-	float32x4_t acc_norm = vdupq_n_f32(0.0f);
-	for (int i = 0; i < dims; i += 4) {
-		float32x4_t a = vld1q_f32(v + i);
-		acc_norm = vmlaq_f32(acc_norm, a, a);
-	}
-	return sqrtf(vaddvq_f32(acc_norm));
-#elif defined(__SSE__)
-	__m128 acc_norm = _mm_setzero_ps();
-	for (int i = 0; i < dims; i += 4) {
-		__m128 a = _mm_loadu_ps(v + i);
-		acc_norm = _mm_add_ps(acc_norm, _mm_mul_ps(a, a));
-	}
-	__m128 shuf = _mm_movehdup_ps(acc_norm);
-	acc_norm = _mm_add_ps(acc_norm, shuf);
-	shuf = _mm_movehl_ps(shuf, acc_norm);
-	acc_norm = _mm_add_ss(acc_norm, shuf);
-	return sqrtf(_mm_cvtss_f32(acc_norm));
+    float32x4_t acc = vdupq_n_f32(0.0f);
+    int i = 0;
+    for (; i + 3 < dims; i += 4) {
+        float32x4_t a = vld1q_f32(v + i);
+        acc = vmlaq_f32(acc, a, a);
+    }
+    float32_t s = vaddvq_f32(acc);
+    for (; i < dims; ++i) s += v[i] * v[i];
+    return sqrtf(s);
+
+#elif defined(__SSE__)  // SSE1 only (xmmintrin.h)
+    __m128 acc = _mm_setzero_ps();
+    int i = 0;
+    for (; i + 3 < dims; i += 4) {
+        __m128 a = _mm_loadu_ps(v + i);
+        acc = _mm_add_ps(acc, _mm_mul_ps(a, a));
+    }
+    __m128 tmp  = _mm_add_ps(acc, _mm_movehl_ps(acc, acc)); // [a0+a2, a1+a3, *, *]
+    __m128 shuf = _mm_shuffle_ps(tmp, tmp, 1);              // mueve elem 1 a la pos 0
+    __m128 sum  = _mm_add_ss(tmp, shuf);                    // (a0+a2)+(a1+a3)
+    float s = _mm_cvtss_f32(sum);
+    for (; i < dims; ++i) s += v[i] * v[i];
+    return sqrtf(s);
+
 #else
-	float32_t n = 0.0f;
-	for (int i = 0; i < dims; i++) 
-		n += v[i] * v[i];
-	return sqrtf(n);
+    float32_t s = 0.0f;
+    for (int i = 0; i < dims; ++i) s += v[i] * v[i];
+    return sqrtf(s);
 #endif
 }
+
 
 void normalize(float32_t *v, int dims) {
 	float32_t n = norm(v,dims);
