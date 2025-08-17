@@ -15,7 +15,7 @@ ifeq ($(OS), Linux)
     LIBNAME_STATIC = libvictor.a
     LIBNAME_LINK = libvictor.so
     CC = gcc
-    CFLAGS = -g -Wall -Wextra -O3 -march=native -fPIC
+    CFLAGS = -g -Wall -Wno-misleading-indentation -Wextra -O3 -march=native -fPIC
     SHARED_FLAGS = -shared -Wl,-soname,libvictor.so.$(SOVERSION)
     INSTALL_LIB = cp $(LIBNAME_SHARED) $(LIBNAME_STATIC) /usr/local/lib/ && \
                   ln -sf /usr/local/lib/$(LIBNAME_SHARED) /usr/local/lib/$(LIBNAME_LINK) && \
