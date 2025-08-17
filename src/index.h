@@ -33,10 +33,7 @@
 #include "victor.h"
 #include "store.h"
 #include "map.h"
-
-#define __LIB_VERSION_MAJOR "1"
-#define __LIB_VERSION_MINOR "0"
-#define __LIB_VERSION_PATCH "15"
+#include "version.h"
 
 
 #if defined(_WIN32) || defined(_WIN64)

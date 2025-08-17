@@ -54,20 +54,6 @@
 #include "index_hnsw.h"
 
 
-/**
- * Returns the version of the library.
- */
-const char *__LIB_VERSION() {
-    static const char version[] = "libvictor " __LIB_VERSION_MAJOR "." __LIB_VERSION_MINOR "." __LIB_VERSION_PATCH
-                                                " (" ARCH " - " OS ")"
-                                                " [" __DATE__ " " __TIME__ "]";
-    return version;
-}
-
-const char *__LIB_SHORT_VERSION() {
-    static const char version[] = __LIB_VERSION_MAJOR "." __LIB_VERSION_MINOR "." __LIB_VERSION_PATCH;
-    return version;
-}
 
 #define UPDATE_TIMESTAT(stat, delta)                   \
     do {                                               \
