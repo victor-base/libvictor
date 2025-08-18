@@ -1,0 +1,10 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@LIBDIR_REL@
+includedir=${prefix}/@INCLUDEDIR_REL@
+#
+Name: libvictor
+Description: Vector search library (Flat/HNSW)
+Version: @VERSION@
+Libs: -L${libdir} -lvictor
+Cflags: -I${includedir}
