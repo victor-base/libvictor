@@ -20,9 +20,6 @@ PKGCONFIGDIR_REL := $(LIBDIR_REL)/pkgconfig
 
 # ----- Targets per OS -----
 ifeq ($(OS), Linux)
-    TARGET = testdb
-    DUTIL  = dutil
-    MUTATE = mutate
     LIBNAME_SHARED = libvictor.so.$(VERSION)
     LIBNAME_STATIC = libvictor.a
     LIBNAME_LINK   = libvictor.so
@@ -37,9 +34,6 @@ ifeq ($(OS), Linux)
       ln -sf "$(LIBNAME_SHARED)" "$(DESTDIR)$(PREFIX)/$(LIBDIR_REL)/libvictor.so.$(SOVERSION)"; \
       if [ -z "$(DESTDIR)" ]; then ldconfig; fi
 else ifeq ($(OS), Darwin)
-    TARGET = testdb.macos
-    DUTIL  = dutil.macos
-    MUTATE = mutate.macos
     LIBNAME_SHARED = libvictor.$(VERSION).dylib
     LIBNAME_STATIC = libvictor.a
     LIBNAME_LINK   = libvictor.dylib
@@ -91,22 +85,7 @@ version.h:
 # =======================
 #  Default target
 # =======================
-all: version.h $(TARGET) $(LIBNAME_SHARED) $(LIBNAME_STATIC)
-
-# Optional targets
-optional: $(DUTIL) $(MUTATE)
-
-# =======================
-#  Binaries
-# =======================
-$(TARGET): $(OBJS) test.c
-	$(CC) $(CFLAGS) $(OBJS) test.c -o $(TARGET) $(LDFLAGS)
-
-$(DUTIL): $(OBJS) dutil.c
-	$(CC) $(CFLAGS) $(OBJS) dutil.c -o $(DUTIL) $(LDFLAGS)
-
-$(MUTATE): $(OBJS) mutate.c
-	$(CC) $(CFLAGS) $(OBJS) mutate.c -o $(MUTATE) $(LDFLAGS)
+all: version.h $(LIBNAME_SHARED) $(LIBNAME_STATIC)
 
 # Object files
 %.o: %.c version.h
@@ -159,9 +138,8 @@ uninstall:
 #  Clean / Test / Debug
 # =======================
 clean:
-	rm -f $(OBJS) $(TARGET) $(LIBNAME_SHARED) $(LIBNAME_STATIC) $(LIBNAME_LINK) $(DUTIL) $(MUTATE)
+	rm -f $(OBJS) $(LIBNAME_SHARED) $(LIBNAME_STATIC) $(LIBNAME_LINK)
 	rm -f *.dylib *.so *.so.* *.a
-	rm -f testdb testdb.macos dutil.macos mutate.macos
 	rm -f version.h libvictor.pc
 
 # Test install using pkg-config
@@ -176,7 +154,6 @@ debug:
 	@echo "CC: $(CC)"
 	@echo "CFLAGS: $(CFLAGS)"
 	@echo "SHARED_FLAGS: $(SHARED_FLAGS)"
-	@echo "TARGET: $(TARGET)"
 	@echo "LIBNAME_SHARED: $(LIBNAME_SHARED)"
 	@echo "LIBNAME_STATIC: $(LIBNAME_STATIC)"
 	@echo "PREFIX: $(PREFIX)"
