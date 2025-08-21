@@ -170,16 +170,19 @@ extern int kv_put(KVTable *c, void *key, int klen, void *value, int vlen);
 extern int kv_get(KVTable *c, void *key, int klen, void **value, int *vlen);
 
 /**
- * @brief Scans the table for keys that match a given prefix pattern.
+ * @brief Scans the table for keys that match a given prefix pattern or wildcard.
  *
  * This function searches through all entries in the hash table and returns
  * those whose keys start with the specified prefix pattern. The scan is
  * performed without acquiring locks (unsafe), so the caller must ensure
  * proper synchronization.
  *
+ * Special functionality: If the pattern is a single asterisk ('*'), the function
+ * will return all entries in the table, effectively performing a full table scan.
+ *
  * @param table Pointer to the KVTable to scan.
- * @param ilike Pointer to the prefix pattern to match against.
- * @param ilen Length of the prefix pattern in bytes.
+ * @param ilike Pointer to the prefix pattern to match against, or "*" for all entries.
+ * @param ilen Length of the prefix pattern in bytes (must be 1 for wildcard "*").
  * @param results Array of KVResult structures to populate (allocated by caller).
  * @param rlen Maximum number of results that can be stored in the results array.
  *
@@ -190,8 +193,10 @@ extern int kv_get(KVTable *c, void *key, int klen, void **value, int *vlen);
  *
  * @note This function does not acquire any locks - caller must ensure thread safety.
  * @note The function performs prefix matching, not exact key matching.
+ * @note Use "*" with ilen=1 to retrieve all entries in the table.
  * @note The caller only needs to allocate the array of structures, not individual pointers.
  * @note The returned key and value pointers point to internal memory - do not free.
+ * @note Results are returned in hash table traversal order, not sorted.
  */
 extern int kv_unsafe_prefix_scan(KVTable *table, void *ilike, int ilen, KVResult *results, int rlen);
 
