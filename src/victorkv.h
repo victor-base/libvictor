@@ -198,7 +198,7 @@ extern int kv_get(KVTable *c, void *key, int klen, void **value, int *vlen);
  * @note The returned key and value pointers point to internal memory - do not free.
  * @note Results are returned in hash table traversal order, not sorted.
  */
-extern int kv_unsafe_prefix_scan(KVTable *table, void *ilike, int ilen, KVResult *results, int rlen);
+extern int kv_unsafe_prefix_scan(KVTable *table, void *ilike, int ilen, KVResult *results, int rlen, int *found);
 
 /**
  * @brief Retrieves a copy of the value associated with a given key from the hash map.

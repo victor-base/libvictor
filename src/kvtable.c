@@ -112,8 +112,8 @@ void kv_unsafe_unlock(KVTable *table) {
  * @param ilen Length of the prefix pattern in bytes (must be 1 for wildcard "*").
  * @param results Array of KVResult structures to populate (allocated by caller).
  * @param rlen Maximum number of results that can be stored in the results array.
- *
- * @return Number of results found (>= 0) on success.
+ * @param found Number of results found (>= 0) on success.
+ * @return KV_SUCCESS | 
  *         KV_ERROR_INVALID_TABLE if table is NULL.
  *         KV_ERROR_INVALID_KEY if ilike is NULL or ilen is invalid.
  *         KV_ERROR_INVALID_VALUE if results is NULL or rlen is invalid.
@@ -125,7 +125,7 @@ void kv_unsafe_unlock(KVTable *table) {
  * @note The returned key and value pointers point to internal memory - do not free.
  * @note Results are returned in hash table traversal order, not sorted.
  */
-int kv_unsafe_prefix_scan(KVTable *table, void *ilike, int ilen, KVResult *results, int rlen) {
+int kv_unsafe_prefix_scan(KVTable *table, void *ilike, int ilen, KVResult *results, int rlen, int *found) {
     int i, r = 0;
     KVNode *node;
     
@@ -154,7 +154,8 @@ int kv_unsafe_prefix_scan(KVTable *table, void *ilike, int ilen, KVResult *resul
             node = node->next;
         }
     }
-    return r;
+	*found = r;
+    return KV_SUCCESS;
 }
 
 /**
