@@ -114,7 +114,7 @@ typedef struct {
  * @return Pointer to the allocated GraphNode, or NULL on failure
  */
 
-extern GraphNode *alloc_graph_node(uint64_t id, float32_t *vector, uint16_t dims_aligned, int M0);
+extern GraphNode *alloc_graph_node(uint64_t id, uint64_t tag, float32_t *vector, uint16_t dims_aligned, int M0);
 
 /**
  * free_gnode - Frees a GraphNode and its associated vector.
@@ -164,6 +164,7 @@ extern void free_graph_node(GraphNode **g);
  */
 extern int graph_knn_search(IndexHNSW *idx, float32_t *vector, Heap *R, int k);
 
+extern int graph_linear_search(IndexHNSW *idx, uint64_t tag, float32_t *restrict v, MatchResult *result, int n);
 
 /**
  * @brief Inserts a new node into the HNSW graph index.

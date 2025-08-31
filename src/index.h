@@ -77,25 +77,21 @@ typedef struct Index {
     pthread_rwlock_t rwlock; // Read-write lock for thread-safe access
 
     /**
-     * Searches for the `n` closest matches to the given vector.
+     * Searches for the `n` closest matches to the given vector with filtering.
+     * 
+     * This function performs approximate nearest neighbor search similar to search_n,
+     * but applies an additional filter to exclude certain vectors from the results.
+     * The filter mechanism is implementation-specific and may vary between index types.
+     * 
      * @param data The specific index data structure.
-     * @param vector The input vector.
-     * @param dims The number of dimensions.
-     * @param results Output array to store the closest matches.
-     * @param n The number of matches to retrieve.
-     * @return The number of matches found, or -1 on error.
+	 * @param tag Filter value used to exclude certain vectors from search results.
+     * @param vector The input vector for which to find nearest neighbors.
+     * @param dims The number of dimensions in the input vector.
+     * @param results Output array to store the filtered closest matches.
+     * @param n The maximum number of matches to retrieve.
+     * @return The number of matches found (0 to n), or negative error code on failure.
      */
-    int (*search_n)(void *, float32_t *, uint16_t, MatchResult *, int);
-
-    /**
-     * Searches for the best match to the given vector.
-     * @param data The specific index data structure.
-     * @param vector The input vector.
-     * @param dims The number of dimensions.
-     * @param result Output structure to store the best match.
-     * @return 0 if successful, or -1 on error.
-     */
-    int (*search)(void *, float32_t *, uint16_t, MatchResult *);
+	int (*search) (void*, uint64_t, float32_t *, uint16_t, MatchResult *, int);
 
     /**
      * Inserts a new vector into the index.
@@ -106,7 +102,7 @@ typedef struct Index {
      * @param ref Optional output pointer to store the internal reference.
      * @return 0 if successful, or -1 on error.
      */
-    int (*insert)(void *data, uint64_t id, float32_t *vector, uint16_t dims, void **ref);
+    int (*insert)(void *data, uint64_t id, uint64_t tag, float32_t *vector, uint16_t dims, void **ref);
 
 	/**
      * Updates the internal context of the index.
@@ -124,6 +120,9 @@ typedef struct Index {
      * @return SUCCESS on success, or an error code on failure.
      */
     int (*remap)(void *data, Map *map);
+
+
+	int (*set_tag) (void *data, void *ref, uint64_t tag);
 
 	/**
      * Compares a vector with a node in the index.
@@ -159,8 +158,33 @@ typedef struct Index {
      */
     int (*dump)(void *data, IOContext *io);
 
+    /**
+     * Exports the index data in a portable format.
+     * 
+     * This function creates an export of the index that can be transferred
+     * between different systems or used for backup purposes. Unlike dump(),
+     * which creates a native binary format, export() typically creates a
+     * more portable representation that may be platform-independent.
+     * 
+     * @param data The specific index data structure to export.
+     * @param io IOContext for writing the exported data.
+     * @return SUCCESS on successful export, or error code on failure.
+     */
 	int (*export)(void *data, IOContext *io);
 
+    /**
+     * Imports index data from a previously exported format.
+     * 
+     * This function reconstructs an index from data that was previously
+     * exported using the export() function. It can handle different import
+     * modes and uses the provided map for ID-to-reference mapping.
+     * 
+     * @param data The index data structure to populate with imported data.
+     * @param io IOContext for reading the import data.
+     * @param map Map structure for ID-to-reference mapping during import.
+     * @param mode Import mode specifying how to handle the import process.
+     * @return SUCCESS on successful import, or error code on failure.
+     */
 	int (*import)(void *data, IOContext *io, Map *map, int mode);
 
     /**

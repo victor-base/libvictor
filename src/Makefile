@@ -7,7 +7,7 @@ OS   := $(shell uname -s 2>/dev/null || echo Windows_NT)
 ARCH := $(shell uname -m)
 
 # Version info
-VERSION   = 1.0.18
+VERSION   = 1.1.1
 SOVERSION = 1
 
 # ----- Install prefix / dirs (multiarch-friendly) -----

@@ -96,7 +96,7 @@
  *         or an appropriate error code (e.g., INVALID_INDEX, INVALID_RESULT, or backend-specific error).
  */
 
-int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *results, int n) {
+int search(Index *index, uint64_t tag, float32_t *vector, uint16_t dims, MatchResult *results, int n) {
     double start, end, delta;
     int ret;
 
@@ -104,61 +104,12 @@ int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *result
     if (vector == NULL) return INVALID_VECTOR;
     if (results == NULL) return INVALID_RESULT;
 
-    if (index->data == NULL || index->search_n == NULL)
+    if (index->data == NULL || index->search == NULL)
         return INVALID_INIT;
     
     pthread_rwlock_rdlock(&index->rwlock);
     start = get_time_ms_monotonic();
-    ret = index->search_n(index->data, vector, dims, results, n);
-    end = get_time_ms_monotonic();
-
-    if (ret == SUCCESS) {
-        delta = end - start;
-        UPDATE_TIMESTAT(index->stats.search_n, delta);
-    }
-    pthread_rwlock_unlock(&index->rwlock);
-    return ret;
-}
-
-/*
- * Searches for the nearest vector in the index to a given query vector.
- *
- * This function performs a single nearest neighbor search using the specified
- * query vector. It retrieves the most similar vector stored in the index
- * based on the index’s configured distance metric (e.g., L2, cosine).
- *
- * Steps:
- * 1. Validates the input parameters (`index`, `vector`, and `result` must be non-NULL).
- * 2. Ensures the index is properly initialized with a search function and data backend.
- * 3. Acquires a read lock to allow concurrent queries while ensuring consistency.
- * 4. Records the start time for performance statistics.
- * 5. Invokes the backend-specific `search` function to find the nearest neighbor.
- * 6. If the search is successful, records the elapsed time into the index’s statistics.
- * 7. Releases the read lock and returns the status.
- *
- * @param index  - Pointer to the index structure to be searched.
- * @param vector - Pointer to the query vector.
- * @param dims   - Number of dimensions of the query vector.
- * @param result - Pointer to a `MatchResult` structure that will hold the best match.
- *
- * @return SUCCESS if a match was found,
- *         or an appropriate error code (e.g., INVALID_INDEX, INVALID_RESULT, or backend-specific error).
- */
-
-int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result) {
-    double start, end, delta;
-    int ret;
-
-    if (index == NULL)  return INVALID_INDEX;
-    if (vector == NULL) return INVALID_VECTOR;
-    if (result == NULL) return INVALID_RESULT;
-
-    if (index->data == NULL || index->search == NULL)
-        return INVALID_INIT;
-
-    pthread_rwlock_rdlock(&index->rwlock);
-    start = get_time_ms_monotonic();
-    ret = index->search(index->data, vector, dims, result);
+    ret = index->search(index->data, tag, vector, dims, results, n);
     end = get_time_ms_monotonic();
 
     if (ret == SUCCESS) {
@@ -280,7 +231,7 @@ end:
  *         or appropriate error code on failure (e.g., INVALID_VECTOR, MAP_ERROR).
  */
 
-int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims) {
+int insert(Index *index, uint64_t id, uint64_t tag, float32_t *vector, uint16_t dims) {
     double start, end, delta;
     void *ref;
     int ret;
@@ -301,7 +252,7 @@ int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims) {
 
 
     start = get_time_ms_monotonic();
-    ret = index->insert(index->data, id, vector, dims, &ref);
+    ret = index->insert(index->data, id, tag, vector, dims, &ref);
     end = get_time_ms_monotonic();
     if (ret == SUCCESS) {
         if ((ret = map_insert_p(&index->map, id, ref)) != MAP_SUCCESS) {
@@ -329,6 +280,27 @@ int update_icontext(Index *index, void *context, int mode) {
 	ret = index->update_icontext(index->data, context, mode);
     pthread_rwlock_unlock(&index->rwlock);
 	return ret;
+}
+
+int set_tag(Index *index, uint64_t id, uint64_t tag) {
+	void *ref;
+	int  ret;
+	if (id == NULL_ID)  return INVALID_ID;
+    if (index == NULL)  return INVALID_INDEX;
+    if (!index->data || !index->set_tag)
+        return INVALID_INIT;
+
+	pthread_rwlock_wrlock(&index->rwlock);
+	ref = map_get_p(&index->map, id);
+    if (ref == NULL) {
+        ret = NOT_FOUND_ID;
+        goto cleanup;
+    }
+	ret = index->set_tag(index->data, ref, tag);
+
+cleanup:
+    pthread_rwlock_unlock(&index->rwlock);
+    return ret;
 }
 
 /*
@@ -651,7 +623,7 @@ Index *kmeans_centroids(Index *from, int nprobe) {
 	}
 
 	for (int i = 0; i < context->c; i++) 
-		if (insert(index, i+1, context->centroids[i], dims_aligned) != SUCCESS) {
+		if (insert(index, i+1, 0,context->centroids[i], dims_aligned) != SUCCESS) {
 			destroy_index(&index);
 			break;
 		}

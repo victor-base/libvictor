@@ -40,8 +40,8 @@
  * sized floating-point array.
  */
 typedef struct __attribute__((aligned(16))) {
-    uint64_t id;
-    uint64_t __res;     
+    uint64_t  id;
+    uint64_t  tag;     
     float32_t vector[];
 } Vector;
 
@@ -56,7 +56,7 @@ extern Vector *alloc_vector(uint16_t dims_aligned);
  * @param dims  Number of dimensions (size of the vector).
  * @return Pointer to the newly allocated `Vector` structure, or NULL on failure.
  */
-extern Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims);
+extern Vector *make_vector(uint64_t id, uint64_t tag, float32_t *src, uint16_t dims);
 
 /**
  * Frees the memory allocated for a `Vector` structure.

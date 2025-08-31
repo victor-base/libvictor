@@ -67,66 +67,23 @@ int delete_node(INodeFlat **head, INodeFlat *node) {
 
 
 /*
- * flat_linear_search - Performs a linear search for the best match in a flat index.
+ * flat_linear_search - Finds the top-N closest matches in a flat index with optional tag filtering.
  *
- * This function iterates through a linked list of indexed vectors, comparing each one
- * with the query vector to determine the closest match based on the specified 
- * comparison method. The function updates the MatchResult structure with the best match found.
+ * Performs a linear search over a linked list of indexed vectors, identifying the top-N closest
+ * matches to a given query vector. Uses a heap to efficiently keep the best results and supports
+ * filtering by tag (bitmask).
  *
- * Steps:
- * 1. Initialize the result with the worst possible match value.
- * 2. Iterate through each node in the linked list.
- * 3. Compute the distance between the query vector and the current node's vector.
- * 4. If the computed distance is better than the current best match, update the result.
- * 5. Continue until all elements have been checked.
- *
- * @param current      - Pointer to the head of the linked list of INodeFlat.
- * @param v            - Pointer to the query vector.
- * @param dims_aligned - Number of aligned dimensions in the vector.
- * @param result       - Pointer to the MatchResult structure to store the best match.
- * @param cmp          - Pointer to the CmpMethod structure that defines the comparison functions.
+ * @param current      Pointer to the head of the linked list of INodeFlat.
+ * @param tag          Bitmask filter: only vectors whose tag shares at least one bit will be considered.
+ *                     If tag == 0, no tag filtering is applied.
+ * @param v            Pointer to the query vector.
+ * @param dims_aligned Number of aligned dimensions in the vector.
+ * @param result       Output array of MatchResult to store the best matches.
+ * @param n            Number of top matches to return.
+ * @param cmp          Pointer to the CmpMethod structure for distance comparison.
+ * @return SUCCESS if the search was successful, SYSTEM_ERROR on memory error.
  */
-void flat_linear_search(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, CmpMethod *cmp) {
-    float32_t distance;
-    result->distance = cmp->worst_match_value;
-    result->id = 0;
-
-    while (current) {
-        distance = cmp->compare_vectors(current->vector->vector, v, dims_aligned);
-        if (cmp->is_better_match(distance, result->distance)) {
-            result->id = current->vector->id;
-            result->distance = distance;
-        }
-        current = current->next;
-    }
-}
-
-
-/*
- * flat_linear_search_n - Finds the top-N closest matches in a flat index.
- *
- * This function performs a linear search over a linked list of indexed vectors,
- * identifying the top-N closest matches to a given query vector. The results
- * are stored in a sorted array, ensuring that the closest matches appear first.
- *
- * Steps:
- * 1. Initialize the top-N results with the worst possible match values.
- * 2. Iterate through the linked list of vectors.
- * 3. Compute the distance between the query vector and each node's vector.
- * 4. If the computed distance is among the top-N best matches:
- *    a. Shift elements to the right to maintain sorted order.
- *    b. Insert the new match in the correct position.
- * 5. Continue until all elements have been checked.
- *
- * @param current      - Pointer to the head of the linked list of INodeFlat.
- * @param v            - Pointer to the query vector.
- * @param dims_aligned - Number of aligned dimensions in the vector.
- * @param result       - Pointer to an array of MatchResult structures to store the top-N matches.
- * @param n            - Number of top matches to find.
- * @param cmp          - Pointer to the CmpMethod structure that defines the comparison functions.
- * @return SYSTEM_ERROR or SUCESS
- */
-int flat_linear_search_n(INodeFlat *current, float32_t *restrict v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp) {
+int flat_linear_search(INodeFlat *current, uint64_t tag, float32_t *restrict v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp) {
     Heap heap = HEAP_INIT();
     HeapNode node;
 
@@ -139,10 +96,12 @@ int flat_linear_search_n(INodeFlat *current, float32_t *restrict v, uint16_t dim
         result[i].id = NULL_ID;
     }
     while (current) {
-		node.distance = cmp->compare_vectors(current->vector->vector, v, dims_aligned);
-		HEAP_NODE_PTR(node) = current;
-		PANIC_IF(heap_insert_or_replace_if_better(&heap, &node) != HEAP_SUCCESS, "error in heap");
-     	current = current->next;
+		if (!tag || (tag & current->vector->tag )) {
+			node.distance = cmp->compare_vectors(current->vector->vector, v, dims_aligned);
+			HEAP_NODE_PTR(node) = current;
+			PANIC_IF(heap_insert_or_replace_if_better(&heap, &node) != HEAP_SUCCESS, "error in heap");
+		}
+		current = current->next;
     }
 
     k = heap_size(&heap);
@@ -156,11 +115,11 @@ int flat_linear_search_n(INodeFlat *current, float32_t *restrict v, uint16_t dim
 }
 
 
-INodeFlat *make_inodeflat(uint64_t id, float32_t *vector, uint16_t dims) {	
+INodeFlat *make_inodeflat(uint64_t id, uint64_t tag, float32_t *vector, uint16_t dims) {	
     INodeFlat *node = (INodeFlat *) calloc_mem(1, sizeof(INodeFlat));
     
     if (node) {
-        if ((node->vector = make_vector(id, vector, dims)) == NULL) {
+        if ((node->vector = make_vector(id, tag, vector, dims)) == NULL) {
             free_mem(node);
             node = NULL;
         }

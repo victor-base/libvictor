@@ -24,3 +24,11 @@ src/mutate.dSYM/Contents/Resources/DWARF/mutate
 src/mutate.dSYM/Contents/Resources/Relocations/aarch64/mutate.yml
 src/1.csv
 src/2.csv
+examples/base.fvecs
+examples/dataset.fvecs
+examples/export.c
+examples/import.c
+examples/ivf
+examples/ivf.c
+examples/recall.c
+*.dylib

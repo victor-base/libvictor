@@ -41,19 +41,23 @@ Vector *alloc_vector(uint16_t dims_aligned) {
  * Allocates and initializes a new `Vector` structure.
  *
  * @param id    Unique identifier for the vector.
+ * @param tag   Tag associated with the vector.
  * @param src   Pointer to the source data (can be NULL).
  * @param dims  Number of dimensions (size of the vector).
  * @return Pointer to the newly allocated `Vector` structure, or NULL on failure.
  */
-Vector *make_vector(uint64_t id, float32_t *src, uint16_t dims) {
+Vector *make_vector(uint64_t id, uint64_t tag, float32_t *src, uint16_t dims) {
     Vector *vector;
     uint16_t dims_aligned = ALIGN_DIMS(dims);
     
 
     vector = alloc_vector(dims_aligned);
-    if (vector && src) {
-        memcpy(vector->vector, src, dims * sizeof(float32_t));
-        vector->id = id;
+    if (vector) {
+        vector->id  = id;
+        vector->tag = tag;
+        if (src) {
+            memcpy(vector->vector, src, dims * sizeof(float32_t));
+        }
         return vector;
     }
     return NULL;

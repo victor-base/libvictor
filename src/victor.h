@@ -136,7 +136,6 @@ typedef struct {
 #endif
     TimeStat dump;       // Dump to file operation
     TimeStat search;     // Single search timing
-    TimeStat search_n;   // Multi-search timing
 } IndexStats;
 
 
@@ -168,19 +167,14 @@ extern const char *__LIB_SHORT_VERSION();
  * Searches for the `n` nearest neighbors using the provided index.
  * Wrapper for Index->search_n.
  */
-extern int search_n(Index *index, float32_t *vector, uint16_t dims, MatchResult *results, int n);
+extern int search(Index *index, uint64_t tag, float32_t *vector, uint16_t dims, MatchResult *results, int n);
 
-/**
- * Searches for the closest match using the provided index.
- * Wrapper for Index->search.
- */
-extern int search(Index *index, float32_t *vector, uint16_t dims, MatchResult *result);
 
 /**
  * Inserts a vector with its ID into the index.
  * Wrapper for Index->insert.
  */
-extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
+extern int insert(Index *index, uint64_t id, uint64_t tag, float32_t *vector, uint16_t dims);
 
 
 /**

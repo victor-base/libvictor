@@ -26,28 +26,28 @@
 #include "map.h"
 
 /**
- * @brief Initializes the random number generator seed.
+ * @brief Initializes the random seed for the HNSW index.
  *
- * Uses the current system time to seed the standard rand() function.
- * This should be called once at the start of the program to ensure
- * non-reproducible randomness.
+ * Uses the current system time to seed the random number generator.
+ * This function should be called once at the start of the program to ensure randomness.
  */
 static void init_random_seed() {
     srand((unsigned int) time(NULL));
 }
 
 /**
- * @brief Search for the top closest neighbors in a HNSW index.
+ * @brief Searches for the top-N closest vectors in the HNSW index with optional tag filtering.
  *
- * @param index   Pointer to the IndexHNSW structure
- * @param vector  Query vector
- * @param dims    Number of dimensions (must match index)
- * @param result  Output array of MatchResult[n], sorted by ascending distance
- * @param n       Len of MatchResult array
- *
- * @returns ErrorCode (SUCCESS or failure reason)
+ * @param index  Pointer to the HNSW index.
+ * @param tag    Bitmask filter: only vectors whose tag shares at least one bit will be considered.
+ *               If tag == 0, no tag filtering is applied.
+ * @param vector Pointer to the query vector.
+ * @param dims   Number of dimensions of the query vector.
+ * @param result Output array of MatchResult to store the best matches.
+ * @param n      Number of top matches to return.
+ * @return SUCCESS if matches are found, or an error code.
  */
-static int hnsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchResult *result, int n) {
+static int hnsw_search(void *index, uint64_t tag, float32_t *vector, uint16_t dims, MatchResult *result, int n) {
     IndexHNSW *idx = (IndexHNSW *)index;
     Heap R = HEAP_INIT();
     HeapNode r;
@@ -56,28 +56,42 @@ static int hnsw_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
     if (dims != idx->dims)
         return INVALID_DIMENSIONS;
 
-    if (init_heap(&R, HEAP_BETTER_TOP, n, idx->cmp->is_better_match)!= HEAP_SUCCESS)
-        return SYSTEM_ERROR;
-    ret = graph_knn_search(idx, vector, &R, n);
-    if (ret == SUCCESS) 
-        for (int i = 0; i < n && heap_size(&R) > 0; i++) {
-            PANIC_IF(heap_pop(&R, &r) != HEAP_SUCCESS, "error in heap");
-            result[i].distance = r.distance;
-            result[i].id = ((GraphNode* )HEAP_NODE_PTR(r))->vector->id; 
-        }
+	if (tag == 0) {
+		if (init_heap(&R, HEAP_BETTER_TOP, n, idx->cmp->is_better_match)!= HEAP_SUCCESS)
+			return SYSTEM_ERROR;
+		ret = graph_knn_search(idx, vector, &R, n);
+		if (ret == SUCCESS) 
+			for (int i = 0; i < n && heap_size(&R) > 0; i++) {
+				PANIC_IF(heap_pop(&R, &r) != HEAP_SUCCESS, "error in heap");
+				result[i].distance = r.distance;
+				result[i].id = ((GraphNode* )HEAP_NODE_PTR(r))->vector->id; 
+			}
 
-    heap_destroy(&R);
-    return ret;
+		heap_destroy(&R);
+		return ret;
+	}
+	return graph_linear_search(idx, tag, vector, result, n);
 }
 
-static int hnsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims, void **ref) {
+/**
+ * @brief Inserts a new vector into the HNSW index.
+ *
+ * @param index  Pointer to the HNSW index.
+ * @param id     Unique identifier for the vector.
+ * @param tag    Tag bitmask for the vector.
+ * @param vector Pointer to the vector data.
+ * @param dims   Number of dimensions of the vector.
+ * @param ref    Output pointer to the inserted node (optional).
+ * @return SUCCESS if inserted, or an error code.
+ */
+static int hnsw_insert(void *index, uint64_t id, uint64_t tag, float32_t *vector, uint16_t dims, void **ref) {
     IndexHNSW *idx = (IndexHNSW *)index;
     GraphNode *node;
     
     if (dims != idx->dims)
         return INVALID_DIMENSIONS;
     
-    node = alloc_graph_node(id, vector, idx->dims_aligned, idx->M0);
+    node = alloc_graph_node(id, tag, vector, idx->dims_aligned, idx->M0);
     if (node == NULL)
         return SYSTEM_ERROR;
 
@@ -91,14 +105,11 @@ static int hnsw_insert(void *index, uint64_t id, float32_t *vector, uint16_t dim
 }
 
 /**
- * @brief Marks a graph node as logically deleted.
+ * @brief Marks a node as deleted in the HNSW index.
  *
- * This function does not physically remove the node from memory or index,
- * it only marks the node as inactive (alive = 0).
- *
- * @param index Pointer to the index (unused but required for signature).
- * @param ref Pointer to the graph node to mark as deleted.
- * @return SUCCESS if the node is marked successfully, INVALID_INDEX if index is NULL.
+ * @param index Pointer to the HNSW index.
+ * @param ref   Pointer to the node to be deleted.
+ * @return SUCCESS if the node was marked as deleted, INVALID_INDEX on error.
  */
 static int hnsw_delete(void *index, void *ref) {
     if (!index) return INVALID_INDEX;
@@ -108,6 +119,15 @@ static int hnsw_delete(void *index, void *ref) {
 }
 
 
+/**
+ * @brief Imports vectors from an IOContext into the HNSW index.
+ *
+ * @param index Pointer to the HNSW index.
+ * @param io    IOContext with vectors to import.
+ * @param map   Map to register imported nodes.
+ * @param mode  Import mode (overwrite, ignore, etc).
+ * @return SUCCESS if successful, or an error code.
+ */
 static int hnsw_import(void *index, IOContext *io, Map *map, int mode) {
 	IndexHNSW *idx = (IndexHNSW *)index;
     GraphNode *node;
@@ -134,7 +154,7 @@ static int hnsw_import(void *index, IOContext *io, Map *map, int mode) {
 			}
 
 		}
-		node = alloc_graph_node(NULL_ID, NULL, 0, idx->M0);
+		node = alloc_graph_node(NULL_ID, 0, NULL, 0, idx->M0);
 		if (node == NULL)
 			return SYSTEM_ERROR;
 		
@@ -150,27 +170,12 @@ static int hnsw_import(void *index, IOContext *io, Map *map, int mode) {
     return SUCCESS;
 }
 
-/**
- * @brief Search for the top closest neighbors in a HNSW index.
- *
- * @param index   Pointer to the IndexHNSW structure
- * @param vector  Query vector
- * @param dims    Number of dimensions (must match index)
- * @param result  Output array of MatchResult[n], sorted by ascending distance
- *
- * @returns ErrorCode (SUCCESS or failure reason)
- */
-static int hnsw_search(void *index, float32_t *vector, uint16_t dims, MatchResult *result) {
-    return hnsw_search_n(index, vector, dims, result, 1);
-}
 
 /**
- * @brief Releases all memory associated with the HNSW index.
+ * @brief Releases all resources associated with the HNSW index.
  *
- * Frees all nodes in the linked list and the index structure itself.
- *
- * @param index A pointer to the index pointer to be released and set to NULL.
- * @return SUCCESS on successful release.
+ * @param index Pointer to the index pointer to be released (set to NULL).
+ * @return SUCCESS on success, INVALID_INDEX if index is NULL.
  */
 static int hnsw_release(void **index) {
     IndexHNSW *idx = (IndexHNSW *)*index;
@@ -193,14 +198,10 @@ static int hnsw_release(void **index) {
 /**
  * @brief Initializes a new HNSW index structure.
  *
- * Allocates and configures a new HNSW index with optional tuning parameters.
- * If no context is provided, default parameters are used.
- *
- * @param method Comparison method identifier (e.g., L2, cosine, dot).
- * @param dims Number of dimensions in the input vectors.
- * @param context Pointer to an HNSWContext structure with configuration parameters,
- *                or NULL to use default values.
- * @return Pointer to the newly initialized IndexHNSW, or NULL on failure.
+ * @param method   Comparison method identifier (e.g., L2, cosine, dot).
+ * @param dims     Number of dimensions in the input vectors.
+ * @param context  Optional configuration parameters (or NULL for defaults).
+ * @return Pointer to the initialized index, or NULL on error.
  */
 static IndexHNSW *hnsw_init(int method, uint16_t dims, HNSWContext *context) {
     IndexHNSW *index = (IndexHNSW *) calloc_mem(1,sizeof(IndexHNSW));
@@ -232,6 +233,13 @@ static IndexHNSW *hnsw_init(int method, uint16_t dims, HNSWContext *context) {
 }
 
 
+/**
+ * @brief Rebuilds the ID-to-node map from the linked list in the HNSW index.
+ *
+ * @param index Pointer to the HNSW index.
+ * @param map   Map to fill with live nodes.
+ * @return SUCCESS if successful, or SYSTEM_ERROR.
+ */
 static int hnsw_remap(void *index, Map *map) {
     IndexHNSW *idx = (IndexHNSW *)index;
     GraphNode *ptr;
@@ -247,6 +255,14 @@ static int hnsw_remap(void *index, Map *map) {
     return SUCCESS;
 }
 
+/**
+ * @brief Updates the context parameters of the HNSW index.
+ *
+ * @param index   Pointer to the HNSW index.
+ * @param context Pointer to the context structure with new parameters.
+ * @param mode    Bitmask indicating which parameters to update.
+ * @return SUCCESS if updated, or an error code.
+ */
 static int hnsw_update_icontext(void *index, void *context, int mode) {
     IndexHNSW   *idx = (IndexHNSW *) index;
     HNSWContext *ctx = (HNSWContext *) context;
@@ -262,6 +278,27 @@ static int hnsw_update_icontext(void *index, void *context, int mode) {
     return SUCCESS;
 }
 
+static int hnsw_set_tag(void *index, void *node, uint64_t tag) {
+	IndexHNSW *idx = (IndexHNSW *)index;
+	GraphNode *n   = (GraphNode *)node;
+
+	if (idx && n && n->vector) {
+		n->vector->tag = tag;
+	} else 
+		return INVALID_REF;
+	return SUCCESS;
+}
+
+/**
+ * @brief Compares a query vector to a node and computes the distance.
+ *
+ * @param index    Pointer to the HNSW index.
+ * @param node     Node to compare.
+ * @param vector   Query vector.
+ * @param dims     Number of dimensions.
+ * @param distance Output: computed distance.
+ * @return SUCCESS if valid, or an error code.
+ */
 static int hnsw_compare(void *index, const void *node, float32_t *vector, uint16_t dims, float32_t *distance) {
 	IndexHNSW *idx = (IndexHNSW *)index;
 	GraphNode *n   = (GraphNode *)node;
@@ -293,14 +330,14 @@ static int hnsw_compare(void *index, const void *node, float32_t *vector, uint16
 __DEFINE_EXPORT_FN(hnsw_export, IndexHNSW, GraphNode)
 
 static inline void hnsw_functions(Index *idx) {
-    idx->search   = hnsw_search;
-    idx->search_n = hnsw_search_n;
+	idx->search   = hnsw_search;
     idx->insert   = hnsw_insert;
     idx->dump     = NULL;
 	idx->export   = hnsw_export;
 	idx->import   = hnsw_import;
     idx->compare  = hnsw_compare;
 	idx->remap    = hnsw_remap;
+	idx->set_tag  = hnsw_set_tag;
     idx->delete   = hnsw_delete;
     idx->release  = hnsw_release;
     idx->update_icontext = hnsw_update_icontext;

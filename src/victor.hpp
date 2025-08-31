@@ -12,9 +12,6 @@ extern "C" {
 
 /**
  * Macro to throw a runtime error if a Victor C API call fails.
- *
- * Usage:
- *   THROW_IF_FAIL(insert(...), "Insert failed");
  */
 #define THROW_IF_FAIL(expr, msg)                                  \
     do {                                                          \
@@ -36,15 +33,12 @@ private:
     }
 
 public:
-    VictorIndex(int type, int method, uint16_t dims, void *ctx) {
+    VictorIndex(int type, int method, uint16_t dims, void *ctx = nullptr) {
         index_ = alloc_index(type, method, dims, ctx);
         if (!index_) {
             throw std::runtime_error("Failed to allocate Index");
         }
     }
-
-	VictorIndex(int type, int method, uint16_t dims)
-    : VictorIndex(type, method, dims, nullptr) {}
 
     ~VictorIndex() {
         if (index_) {
@@ -61,25 +55,24 @@ public:
         return VictorIndex(idx);
     }
 
-    void insert(uint64_t id, const std::vector<float>& vec) {
+    void insert(uint64_t id, uint64_t tag, const std::vector<float>& vec) {
         if (!index_) throw std::runtime_error("Invalid Index");
-        THROW_IF_FAIL(::insert(index_, id, const_cast<float*>(vec.data()), static_cast<uint16_t>(vec.size())),
+        THROW_IF_FAIL(::insert(index_, id, tag, const_cast<float*>(vec.data()), static_cast<uint16_t>(vec.size())),
                       "Insert operation failed");
     }
 
-    
-    std::pair<uint64_t, float> search(const std::vector<float>& vec) {
+    std::pair<uint64_t, float> search(const std::vector<float>& vec, uint64_t tag = 0) {
         if (!index_) throw std::runtime_error("Invalid Index");
         MatchResult result;
-        THROW_IF_FAIL(::search(index_, const_cast<float*>(vec.data()), static_cast<uint16_t>(vec.size()), &result),
+        THROW_IF_FAIL(::search(index_, tag, const_cast<float*>(vec.data()), static_cast<uint16_t>(vec.size()), &result, 1),
                       "Search operation failed");
         return { result.id, result.distance };
     }
 
-    std::vector<std::pair<uint64_t, float>> search_n(const std::vector<float>& vec, int n) {
+    std::vector<std::pair<uint64_t, float>> search_n(const std::vector<float>& vec, int n, uint64_t tag = 0) {
         if (!index_) throw std::runtime_error("Invalid Index");
         std::vector<MatchResult> results(n);
-        THROW_IF_FAIL(::search_n(index_, const_cast<float*>(vec.data()), static_cast<uint16_t>(vec.size()), results.data(), n),
+        THROW_IF_FAIL(::search(index_, tag, const_cast<float*>(vec.data()), static_cast<uint16_t>(vec.size()), results.data(), n),
                       "Search_n operation failed");
 
         std::vector<std::pair<uint64_t, float>> output;

@@ -73,7 +73,7 @@ static inline int assign_level(int M0) {
  * @return Pointer to the allocated GraphNode, or NULL on failure
  */
 
-GraphNode *alloc_graph_node(uint64_t id, float32_t *vector, uint16_t dims_aligned, int M0) {
+GraphNode *alloc_graph_node(uint64_t id, uint64_t tag, float32_t *vector, uint16_t dims_aligned, int M0) {
     GraphNode *node = NULL;
     int M = M0 / 2;
     int level = assign_level(M0);
@@ -89,7 +89,7 @@ GraphNode *alloc_graph_node(uint64_t id, float32_t *vector, uint16_t dims_aligne
         return NULL;
 
 	if (vector && id != NULL_ID) {
-		node->vector = make_vector(id, vector, dims_aligned);
+		node->vector = make_vector(id, tag, vector, dims_aligned);
 		if (!node->vector) {
 			free_mem(node);
 			return NULL;
@@ -150,6 +150,9 @@ typedef struct {
     float32_t *query;       /* Aligned pointer to the query vector. Used for distance comparisons. */
     uint16_t  dims_aligned; /* Padded/aligned number of dimensions (mod 4 or 16 for SIMD use). */
     CmpMethod *cmp;         /* Pointer to distance comparison function (e.g., L2, cosine, dot). */
+
+	// flags
+	int filter_alive;
 } SearchContext;
 
 #define SELECT_NEIGHBORS_SIMPLE     0x00
@@ -559,7 +562,8 @@ static int search_layer(SearchContext *sc, GraphNode **ep, int len, int ef, int 
                 goto cleanup_return;
             }
             PANIC_IF(heap_insert(&C, &n) != HEAP_SUCCESS, "invalid heap");
-            PANIC_IF(heap_insert(W, &n)  != HEAP_SUCCESS, "invalid heap");
+            if (!sc->filter_alive || current->alive)
+            	PANIC_IF(heap_insert(W, &n)  != HEAP_SUCCESS, "invalid heap");
         }
     }
 
@@ -567,11 +571,11 @@ static int search_layer(SearchContext *sc, GraphNode **ep, int len, int ef, int 
 
         PANIC_IF(heap_pop(&C, &c)  != HEAP_SUCCESS, "lack of consistency");
 
-        PANIC_IF(heap_peek(W, &w) != HEAP_SUCCESS, "lack of consistency");
-
-        if (heap_full(W) && sc->cmp->is_better_match(w.distance, c.distance)) 
-            break;
-        
+		if (heap_size(W) > 0) {
+			PANIC_IF(heap_peek(W, &w) != HEAP_SUCCESS, "lack of consistency");
+			if (heap_full(W) && sc->cmp->is_better_match(w.distance, c.distance)) 
+				break;
+		}
         
         current = (GraphNode *) HEAP_NODE_PTR(c);
         for (i = 0; i < (int) ODEGREE(current, level); i++) {
@@ -585,12 +589,17 @@ static int search_layer(SearchContext *sc, GraphNode **ep, int len, int ef, int 
                 }
                 d = sc->cmp->compare_vectors(sc->query, neighbor->vector->vector, sc->dims_aligned);
                 n = HEAP_NODE_SET_PTR(neighbor, d);
-                if (!heap_full(W) || sc->cmp->is_better_match(d, w.distance)) {	
+				
+				if (heap_size(W) > 0) {
+					PANIC_IF(heap_peek(W, &w) != HEAP_SUCCESS, "lack of consistency");
+				}
+				if (!heap_full(W) || sc->cmp->is_better_match(d, w.distance)) {	
                     PANIC_IF(heap_insert(&C, &n) == HEAP_ERROR_FULL, "bad initialization");
                 }
                 
-                if (neighbor->alive) {
+                if (!sc->filter_alive || neighbor->alive) {
                     if (heap_full(W)) {
+						PANIC_IF(heap_peek(W, &w) != HEAP_SUCCESS, "lack of consistency");
                         if (sc->cmp->is_better_match(n.distance, w.distance)) {
                             PANIC_IF(heap_replace(W, &n) != HEAP_SUCCESS, "cannot replace worst node in W");
                         }
@@ -679,11 +688,11 @@ int graph_insert(IndexHNSW *idx, GraphNode *node) {
     idx->head = node;
 
     // Fill Search Context
-    sc.cmp = idx->cmp;
+    sc.cmp   = idx->cmp;
     sc.query = node->vector->vector;
-    sc.dims_aligned = idx->dims_aligned;
-
-    entry = calloc_mem(idx->M0, sizeof(GraphNode *));
+    sc.dims_aligned   = idx->dims_aligned;
+	sc.filter_alive = 0;
+	entry = calloc_mem(idx->M0, sizeof(GraphNode *));
     if (!entry)
         goto return_with_error;
    /*
@@ -756,6 +765,58 @@ return_with_error:
     return SYSTEM_ERROR;
 }
 
+/*
+ * flat_linear_search - Finds the top-N closest matches in a flat index with optional tag filtering.
+ *
+ * Performs a linear search over a linked list of indexed vectors, identifying the top-N closest
+ * matches to a given query vector. Uses a heap to efficiently keep the best results and supports
+ * filtering by tag (bitmask).
+ *
+ * @param current      Pointer to the head of the linked list of INodeFlat.
+ * @param tag          Bitmask filter: only vectors whose tag shares at least one bit will be considered.
+ *                     If tag == 0, no tag filtering is applied.
+ * @param v            Pointer to the query vector.
+ * @param dims_aligned Number of aligned dimensions in the vector.
+ * @param result       Output array of MatchResult to store the best matches.
+ * @param n            Number of top matches to return.
+ * @param cmp          Pointer to the CmpMethod structure for distance comparison.
+ * @return SUCCESS if the search was successful, SYSTEM_ERROR on memory error.
+ */
+int graph_linear_search(IndexHNSW *idx, uint64_t tag, float32_t *restrict v, MatchResult *result, int n) {
+    Heap heap = HEAP_INIT();
+    HeapNode node;
+	GraphNode *current = idx->head;
+
+	if (!current) 
+		return SUCCESS;
+
+    if (init_heap(&heap, HEAP_WORST_TOP, n, idx->cmp->is_better_match) == HEAP_ERROR_ALLOC)
+        return SYSTEM_ERROR;
+    
+    int i, k;
+    for (i = 0; i < n; i++) {
+        result[i].distance = idx->cmp->worst_match_value;
+        result[i].id = NULL_ID;
+    }
+    while (current) {
+		if (!tag || (tag & current->vector->tag )) {
+			node.distance = idx->cmp->compare_vectors(current->vector->vector, v, idx->dims_aligned);
+			HEAP_NODE_PTR(node) = current;
+			PANIC_IF(heap_insert_or_replace_if_better(&heap, &node) != HEAP_SUCCESS, "error in heap");
+		}
+		current = current->next;
+    }
+
+    k = heap_size(&heap);
+	while (k > 0) {
+		heap_pop(&heap, &node);
+		result[--k].distance = node.distance;
+		result[k].id = ((GraphNode *)HEAP_NODE_PTR(node))->vector->id;
+	}
+    heap_destroy(&heap);
+    return SUCCESS;
+}
+
 
 /**
  * @brief Performs approximate nearest neighbor search in HNSW index.
@@ -808,8 +869,8 @@ int graph_knn_search(IndexHNSW *idx, float32_t *vector, Heap *R, int k) {
 
     memcpy(sc.query, vector, idx->dims_aligned*sizeof(float32_t));
     sc.cmp = idx->cmp;
-    sc.dims_aligned = idx->dims_aligned;
-
+    sc.dims_aligned   = idx->dims_aligned;
+	sc.filter_alive = 0;
     ep = idx->gentry;
     for (i = idx->top_level; i > 0; i--) {
         if (search_layer(&sc, &ep, 1, 1, i, &W) != SUCCESS)
@@ -821,7 +882,10 @@ int graph_knn_search(IndexHNSW *idx, float32_t *vector, Heap *R, int k) {
         heap_destroy(&W);
     }
 	ef = k > idx->ef_search ? k * 2 : idx->ef_search;
-    if (search_layer(&sc, &ep,1, ef, 0, &W) != SUCCESS)
+	// Agregar si filtro, agregar si tiene en cuenta borrados
+    
+	sc.filter_alive = 1;
+	if (search_layer(&sc, &ep,1, ef, 0, &W) != SUCCESS)
         goto return_with_error;
 
     if (select_neighbors(&sc, &W, k, 0, 0) != SUCCESS)

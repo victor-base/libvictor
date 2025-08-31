@@ -1,0 +1,10 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+#
+Name: libvictor
+Description: Vector search library (Flat/HNSW)
+Version: 1.1.0
+Libs: -L${libdir} -lvictor
+Cflags: -I${includedir}

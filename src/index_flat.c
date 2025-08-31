@@ -92,25 +92,12 @@ static IndexFlat *flat_init(int method, uint16_t dims) {
 }
 
 
-/*
- * flat_remove - Removes a vector from the flat index.
+/**
+ * @brief Deletes a vector node from the flat index.
  *
- * This function searches for a vector with the given ID in the flat index and removes it.
- * The operation ensures thread safety by acquiring a write lock before modifying the index.
- *
- * Steps:
- * 1. Validate the index pointer.
- * 2. Acquire a write lock to prevent concurrent modifications.
- * 3. Call `delete_node` to remove the corresponding node from the linked list.
- * 4. If a node was successfully deleted, decrement the total element count.
- * 5. Release the write lock.
- *
- * @param index - Pointer to the flat index (`IndexFlat`).
- * @param id    - Unique identifier of the vector to be removed.
- *
- * @return SUCCESS if the vector was found and removed.
- *         INVALID_INDEX if the index pointer is NULL.
- *         INVALID_ID if the vector ID was not found in the index.
+ * @param index Pointer to the flat index.
+ * @param ref   Pointer to the node to be deleted.
+ * @return SUCCESS if the node was deleted, INVALID_INDEX or INVALID_ID on error.
  */
 static int flat_delete(void *index, void *ref) {
     IndexFlat *ptr  = (IndexFlat *)index;
@@ -124,37 +111,19 @@ static int flat_delete(void *index, void *ref) {
 }
 
 
-/*
- * flat_search_n - Searches for the top-N closest vectors in the flat index.
+/**
+ * @brief Searches for the top-N closest vectors in the flat index with optional tag filtering.
  *
- * This function performs a nearest neighbor search in a linked list-based
- * flat index, returning the top-N closest matches to the given query vector.
- * 
- * Steps:
- * 1. Validate input parameters.
- * 2. Allocate memory for storing the top-N matches.
- * 3. If necessary, allocate an aligned copy of the query vector.
- * 4. Acquire a read lock to ensure thread safety.
- * 5. Traverse the list and compute distances between stored vectors and the query vector.
- * 6. Maintain a sorted list of the N best matches found.
- * 7. Release the read lock.
- * 8. Free allocated memory if applicable.
- *
- * @param index  - Pointer to the flat index (`IndexFlat`).
- * @param vector - Pointer to the query vector.
- * @param dims   - Number of dimensions of the query vector.
- * @param result - Pointer to a pointer that will store an array of `MatchResult` containing the N best matches.
- * @param n      - Number of top matches to retrieve.
- *
- * @return SUCCESS if matches are found.
- *         INVALID_INDEX if the index pointer is NULL.
- *         INVALID_VECTOR if the vector pointer is NULL.
- *         INVALID_DIMENSIONS if the vector dimensions do not match the index.
- *         INVALID_RESULT if the result pointer is NULL.
- *         SYSTEM_ERROR if memory allocation fails.
- *         INDEX_EMPTY if no elements exist in the index.
+ * @param index  Pointer to the flat index.
+ * @param tag    Bitmask filter: only vectors whose tag shares at least one bit will be considered.
+ *               If tag == 0, no tag filtering is applied.
+ * @param vector Pointer to the query vector.
+ * @param dims   Number of dimensions of the query vector.
+ * @param result Output array of MatchResult to store the best matches.
+ * @param n      Number of top matches to return.
+ * @return SUCCESS if matches are found, or an error code.
  */
-static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchResult *result, int n) {
+static int flat_search(void *index, uint64_t tag, float32_t *vector, uint16_t dims, MatchResult *result, int n) {
     IndexFlat *idx = (IndexFlat *)index;
     INodeFlat *current;
     float32_t *v;
@@ -176,111 +145,32 @@ static int flat_search_n(void *index, float32_t *vector, uint16_t dims, MatchRes
     if (current == NULL) {
         ret = INDEX_EMPTY;
     } else {
-        ret = flat_linear_search_n(current, v, idx->dims_aligned, result, n, idx->cmp);
+        ret = flat_linear_search(current, tag, v, idx->dims_aligned, result, n, idx->cmp);
     }
 
     free_aligned_mem(v);
     return ret;
 }
 
-
-/*
- * flat_search - Searches for the best matching vector in the flat index.
+/**
+ * @brief Inserts a new vector into the flat index.
  *
- * This function performs a nearest neighbor search in a linked list-based
- * flat index. It finds the vector with the smallest distance (or highest
- * similarity) to the given query vector.
- *
- * Steps:
- * 1. Validate input parameters.
- * 2. Allocate memory for an aligned copy of the input vector if necessary.
- * 3. Initialize the result structure.
- * 4. Acquire a read lock to ensure thread safety.
- * 5. Traverse the list and compute distances between stored vectors and the query vector.
- * 6. Store the best match found.
- * 7. Release the read lock.
- * 8. Free allocated memory if applicable.
- *
- * @param index  - Pointer to the flat index (`IndexFlat`).
- * @param vector - Pointer to the query vector.
- * @param dims   - Number of dimensions of the query vector.
- * @param result - Pointer to `MatchResult`, which will store the best match.
- *
- * @return SUCCESS if a match is found.
- *         INVALID_INDEX if the index pointer is NULL.
- *         INVALID_VECTOR if the vector pointer is NULL.
- *         INVALID_DIMENSIONS if the vector dimensions do not match the index.
- *         INVALID_RESULT if the result pointer is NULL.
- *         SYSTEM_ERROR if memory allocation fails.
- *         INDEX_EMPTY if no elements exist in the index.
+ * @param index  Pointer to the flat index.
+ * @param id     Unique identifier for the vector.
+ * @param tag    Tag bitmask for the vector.
+ * @param vector Pointer to the vector data.
+ * @param dims   Number of dimensions of the vector.
+ * @param ref    Output pointer to the inserted node (optional).
+ * @return SUCCESS if inserted, or an error code.
  */
-static int flat_search(void *index, float32_t *vector, uint16_t dims, MatchResult *result) {
-    IndexFlat *idx = (IndexFlat *)index;
-    INodeFlat *current;
-    float32_t *v;
-    int ret;
-
-    if (dims != idx->dims) 
-        return INVALID_DIMENSIONS;
-
-    if (idx->head == NULL)
-        return INDEX_EMPTY;
-
-
-    v = (float32_t *) aligned_calloc_mem(16, idx->dims_aligned * sizeof(float32_t));
-    if (v == NULL)
-        return SYSTEM_ERROR;
-
-    memcpy(v, vector, dims * sizeof(float32_t));
-
-    current = idx->head;
-    if (current == NULL) {
-        ret = INDEX_EMPTY;
-    } else {
-        flat_linear_search(current, v, idx->dims_aligned, result, idx->cmp);
-        ret = SUCCESS;
-    }
-
-    free_aligned_mem(v);
-    return ret;
-}
-
-/*
- * flat_insert - Inserts a new vector into the flat index.
- *
- * This function inserts a new vector into the linked list-based flat index. 
- * It first validates the input parameters, then allocates memory for a new 
- * node and vector. The function ensures thread safety using a write lock.
- *
- * Steps:
- * 1. Validate input parameters.
- * 2. Allocate memory for a new linked list node (`INodeFlat`).
- * 3. Create a new `Vector` instance that holds the vector data and ID.
- * 4. If allocation fails, return an appropriate error code.
- * 5. Lock the index with a write lock to ensure safe concurrent operations.
- * 6. Insert the new node at the head of the list.
- * 7. Increment the element count in the index.
- * 8. Unlock the write lock.
- *
- * @param index  - Pointer to the flat index structure (`IndexFlat`).
- * @param id     - Unique identifier for the vector.
- * @param vector - Pointer to the vector data.
- * @param dims   - Number of dimensions of the vector.
- *
- * @return SUCCESS if insertion is successful.
- *         INVALID_INDEX if the index pointer is NULL.
- *         INVALID_VECTOR if the vector pointer is NULL.
- *         INVALID_DIMENSIONS if the vector dimensions do not match the index.
- *         SYSTEM_ERROR if memory allocation fails.
- */
-static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dims, void **ref) {
+static int flat_insert(void *index, uint64_t id, uint64_t tag, float32_t *vector, uint16_t dims, void **ref) {
     IndexFlat *ptr = (IndexFlat *)index;
     INodeFlat *node;
 
     if (dims != ptr->dims) 
         return INVALID_DIMENSIONS;
 
-    if ((node = make_inodeflat(id, vector, dims)) == NULL)
+    if ((node = make_inodeflat(id, tag, vector, dims)) == NULL)
         return SYSTEM_ERROR;
 
     insert_node(&(ptr->head), node);
@@ -292,6 +182,13 @@ static int flat_insert(void *index, uint64_t id, float32_t *vector, uint16_t dim
     return SUCCESS;
 }
 
+/**
+ * @brief Rebuilds the ID-to-node map from the linked list in the flat index.
+ *
+ * @param index Pointer to the flat index.
+ * @param map   Map to fill with live nodes.
+ * @return SUCCESS if successful, or SYSTEM_ERROR.
+ */
 static int flat_remap(void *index, Map *map) {
     IndexFlat *idx = (IndexFlat *)index;
     INodeFlat *ptr;
@@ -307,6 +204,16 @@ static int flat_remap(void *index, Map *map) {
     return SUCCESS;
 }
 
+/**
+ * @brief Compares a query vector to a node and computes the distance.
+ *
+ * @param index    Pointer to the flat index.
+ * @param node     Node to compare.
+ * @param vector   Query vector.
+ * @param dims     Number of dimensions.
+ * @param distance Output: computed distance.
+ * @return SUCCESS if valid, or an error code.
+ */
 static int flat_compare(void *index, const void *node, float32_t *vector, uint16_t dims, float32_t *distance) {
 	IndexFlat *idx = (IndexFlat *)index;
 	INodeFlat *n   = (INodeFlat *)node;
@@ -329,13 +236,29 @@ static int flat_compare(void *index, const void *node, float32_t *vector, uint16
 	return SUCCESS;
 }
 
-__DEFINE_EXPORT_FN(flat_export, IndexFlat, INodeFlat)
+/**
+ * @brief Sets the tag bitmask for a node in the flat index.
+ *
+ * @param index Pointer to the flat index.
+ * @param node  Node whose tag will be set.
+ * @param tag   New tag bitmask.
+ * @return SUCCESS if set, INVALID_REF if node is invalid.
+ */
+static int flat_set_tag(void *index, void *node, uint64_t tag) {
+	IndexFlat *idx = (IndexFlat *)index;
+	INodeFlat *n   = (INodeFlat *)node;
 
-/*
- * flat_release - Releases all resources associated with a flat index.
+	if (idx && n && n->vector) {
+		n->vector->tag = tag;
+	} else 
+		return INVALID_REF;
+	return SUCCESS;
+}
+
+/**
+ * @brief Releases all resources associated with a flat index.
  *
- * @param index - Pointer to the index to be released.
- *
+ * @param index Pointer to the index pointer to be released (set to NULL).
  * @return SUCCESS on success, INVALID_INDEX if index is NULL.
  */
 static int flat_release(void **index) {
@@ -356,6 +279,13 @@ static int flat_release(void **index) {
     return SUCCESS;
 }
 
+/**
+ * @brief Dumps all vectors from the flat index into an IOContext.
+ *
+ * @param index Pointer to the flat index.
+ * @param io    IOContext to fill with vectors.
+ * @return SUCCESS if successful, SYSTEM_ERROR on error.
+ */
 static int flat_dump(void *index, IOContext *io) {
     IndexFlat *idx = index;
     INodeFlat *entry = NULL;
@@ -414,6 +344,15 @@ error_return:
     return NULL;
 }
 
+/**
+ * @brief Imports vectors from an IOContext into the flat index.
+ *
+ * @param idx   Pointer to the flat index.
+ * @param io    IOContext with vectors to import.
+ * @param map   Map to register imported nodes.
+ * @param mode  Import mode (overwrite, ignore, etc).
+ * @return SUCCESS if successful, or an error code.
+ */
 static int flat_import(void *idx, IOContext *io, Map *map, int mode) {
 	IndexFlat *index = (IndexFlat *) idx;
 	INodeFlat *node;
@@ -452,6 +391,8 @@ static int flat_import(void *idx, IOContext *io, Map *map, int mode) {
     return SUCCESS;
 }
 
+__DEFINE_EXPORT_FN(flat_export, IndexFlat, INodeFlat)
+
 /*-------------------------------------------------------------------------------------*
  *                                PUBLIC FUNCTIONS                                     *
  *-------------------------------------------------------------------------------------*/
@@ -469,11 +410,11 @@ static int flat_import(void *idx, IOContext *io, Map *map, int mode) {
 
  static inline void flat_functions(Index *idx) {
     idx->search   = flat_search;
-    idx->search_n = flat_search_n;
     idx->insert   = flat_insert;
     idx->dump     = flat_dump;
 	idx->export   = flat_export;
 	idx->import   = flat_import;
+	idx->set_tag  = flat_set_tag;
 	idx->compare  = flat_compare;
     idx->remap    = flat_remap;
     idx->delete   = flat_delete;

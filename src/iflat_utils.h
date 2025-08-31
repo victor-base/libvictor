@@ -45,30 +45,6 @@ extern INodeFlat *search_node(INodeFlat **head, uint64_t id);
  */
 extern int delete_node(INodeFlat **head, INodeFlat *node);
 
-
-/*
- * flat_linear_search - Performs a linear search for the best match in a flat index.
- *
- * This function iterates through a linked list of indexed vectors, comparing each one
- * with the query vector to determine the closest match based on the specified 
- * comparison method. The function updates the MatchResult structure with the best match found.
- *
- * Steps:
- * 1. Initialize the result with the worst possible match value.
- * 2. Iterate through each node in the linked list.
- * 3. Compute the distance between the query vector and the current node's vector.
- * 4. If the computed distance is better than the current best match, update the result.
- * 5. Continue until all elements have been checked.
- *
- * @param current      - Pointer to the head of the linked list of INodeFlat.
- * @param v            - Pointer to the query vector.
- * @param dims_aligned - Number of aligned dimensions in the vector.
- * @param result       - Pointer to the MatchResult structure to store the best match.
- * @param cmp          - Pointer to the CmpMethod structure that defines the comparison functions.
- */
-extern void flat_linear_search(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, CmpMethod *cmp);
-
-
 /*
  * flat_linear_search_n - Finds the top-N closest matches in a flat index.
  *
@@ -92,8 +68,8 @@ extern void flat_linear_search(INodeFlat *current, float32_t *v, uint16_t dims_a
  * @param n            - Number of top matches to find.
  * @param cmp          - Pointer to the CmpMethod structure that defines the comparison functions.
  */
-extern int flat_linear_search_n(INodeFlat *current, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp);
+extern int flat_linear_search(INodeFlat *current, uint64_t tag, float32_t *v, uint16_t dims_aligned, MatchResult *result, int n, CmpMethod *cmp);
 
 
-extern INodeFlat *make_inodeflat(uint64_t id, float32_t *vector, uint16_t dims);
+extern INodeFlat *make_inodeflat(uint64_t id, uint64_t tag, float32_t *vector, uint16_t dims);
 #endif
